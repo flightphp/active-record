@@ -57,7 +57,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         }
     }
 
-    public function testInsertUser()
+    public function testInsert()
     {
         $user = new User();
         $user->name = 'demo';
@@ -66,7 +66,13 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->assertGreaterThan(0, $user->id);
     }
 
-    public function testEditUser()
+	public function testInsertNoChanges() {
+		$user = new User();
+		$result = $user->insert();
+		$this->assertTrue($result);
+	}
+
+    public function testEdit()
     {
         $original_password = md5('demo');
         $user = new User();
@@ -82,6 +88,15 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->assertNotEquals($original_password, $user->password);
         $this->assertEquals($original_id, $user->id);
     }
+
+	public function testUpdateNoChanges() {
+		$user = new User();
+		$user->name = 'demo';
+        $user->password = 'pass';
+        $user->insert();
+		$result = $user->update();
+		$this->assertTrue($result);
+	}
 
     public function testRelations()
     {
@@ -158,18 +173,18 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $contact->address = 'test address';
         $contact->insert();
 
-        $user->isnotnull('id')->eq('id', 1)->lt('id', 2)->gt('id', 0)->find();
+        $user->isNotNull('id')->eq('id', 1)->lt('id', 2)->gt('id', 0)->find();
         $this->assertGreaterThan(0, $user->id);
-        $this->assertSame(array(), $user->dirty);
+        $this->assertSame([], $user->dirty);
         $user->name = 'testname';
         $this->assertSame(array('name'=>'testname'), $user->dirty);
         $name = $user->name;
         $this->assertEquals('testname', $name);
         unset($user->name);
         $this->assertSame(array(), $user->dirty);
-        $user->reset()->isnotnull('id')->eq('id', 'aaa"')->wrap()->lt('id', 2)->gt('id', 0)->wrap('OR')->find();
+        $user->reset()->isNotNull('id')->eq('id', 'aaa"')->wrap()->lt('id', 2)->gt('id', 0)->wrap('OR')->find();
         $this->assertGreaterThan(0, $user->id);
-        $user->reset()->isnotnull('id')->between('id', array(0, 2))->find();
+        $user->reset()->isNotNull('id')->between('id', array(0, 2))->find();
         $this->assertGreaterThan(0, $user->id);
     }
     

@@ -19,34 +19,56 @@ use PDO;
  * Simple implement of active record in PHP.<br />
  * Using magic function to implement more smarty functions.<br />
  * Can using chain method calls, to build concise and compactness program.<br />
+ * 
+ * @method self equal(string $field, mixed $value, string $operator = 'AND') Equal operator
+ * @method self eq(string $field, mixed $value, string $operator = 'AND') Equal operator
+ * @method self notEqual(string $field, mixed $value, string $operator = 'AND') Not Equal operator
+ * @method self ne(string $field, mixed $value, string $operator = 'AND') Not Equal operator
+ * @method self greaterThan(string $field, mixed $value, string $operator = 'AND') Greater Than
+ * @method self gt(string $field, mixed $value, string $operator = 'AND') Greater Than
+ * @method self lessThan(string $field, mixed $value, string $operator = 'AND') Less Than
+ * @method self lt(string $field, mixed $value, string $operator = 'AND') Less Than
+ * @method self greaterThanOrEqual(string $field, mixed $value, string $operator = 'AND') Greater Than or Equal To
+ * @method self ge(string $field, mixed $value, string $operator = 'AND') Greater Than or Equal To
+ * @method self gte(string $field, mixed $value, string $operator = 'AND') Greater Than or Equal To
+ * @method self less(string $field, mixed $value, string $operator = 'AND') Less Than or Equal To
+ * @method self le(string $field, mixed $value, string $operator = 'AND') Less Than or Equal To
+ * @method self lte(string $field, mixed $value, string $operator = 'AND') Less Than or Equal To
+ * @method self between(string $field, array<int,mixed> $value, string $operator = 'AND') Between
  */
 abstract class ActiveRecord extends Base
 {
+	const BELONGS_TO = 'belongs_to';
+    const HAS_MANY = 'has_many';
+    const HAS_ONE = 'has_one';
+
     /**
      * @var PDO static property to connect database.
      */
     public static $db;
     /**
-     * @var array maping the function name and the operator, to build Expressions in WHERE condition.
+     * @var array mapping the function name and the operator, to build Expressions in WHERE condition.
      * <pre>user can call it like this:
-     *      $user->isnotnull()->eq('id', 1);
+     *      $user->isNotNull()->eq('id', 1);
      * will create Expressions can explain to SQL:
      *      WHERE user.id IS NOT NULL AND user.id = :ph1</pre>
      */
-    public static $operators = array(
+    public static $operators = [
         'equal' => '=', 'eq' => '=',
-        'notequal' => '<>', 'ne' => '<>',
-        'greaterthan' => '>', 'gt' => '>',
-        'lessthan' => '<', 'lt' => '<',
-        'greaterthanorequal' => '>=', 'ge' => '>=','gte' => '>=',
-        'lessthanorequal' => '<=', 'le' => '<=','lte' => '<=',
+        'notEqual' => '<>', 'ne' => '<>',
+        'greaterThan' => '>', 'gt' => '>',
+        'lessThan' => '<', 'lt' => '<',
+        'greaterThanOrEqual' => '>=', 'ge' => '>=','gte' => '>=',
+        'lessThanOrEqual' => '<=', 'le' => '<=','lte' => '<=',
         'between' => 'BETWEEN',
         'like' => 'LIKE',
+		'notLike' => 'NOT LIKE',
         'in' => 'IN',
-        'notin' => 'NOT IN',
-        'isnull' => 'IS NULL',
-        'isnotnull' => 'IS NOT NULL', 'notnull' => 'IS NOT NULL',
-    );
+        'notIn' => 'NOT IN',
+        'isNull' => 'IS NULL',
+        'isNotNull' => 'IS NOT NULL', 
+		'notNull' => 'IS NOT NULL',
+	];
     /**
      * @var array Part of SQL, maping the function name and the operator to build SQL Part.
      * <pre>call function like this:
@@ -68,13 +90,27 @@ abstract class ActiveRecord extends Base
     /**
      * @var array Static property to stored the default Sql Expressions values.
      */
-    public static $defaultSqlExpressions = array('expressions' => array(), 'wrap' => false,
-        'select'=>null, 'insert'=>null, 'update'=>null, 'set' => null, 'delete'=>'DELETE ', 'join' => null,
-        'from'=>null, 'values' => null, 'where'=>null, 'having'=>null, 'limit'=>null, 'order'=>null, 'group' => null);
+    public static $defaultSqlExpressions = [ 
+		'expressions' => [], 
+		'wrap' => false,
+        'select'=>null, 
+		'insert'=>null, 
+		'update'=>null, 
+		'set' => null, 
+		'delete'=>'DELETE ', 
+		'join' => null,
+        'from'=>null, 
+		'values' => null, 
+		'where'=>null, 
+		'having'=>null, 
+		'limit'=>null, 
+		'order'=>null, 
+		'group' => null 
+	];
     /**
      * @var array Stored the Expressions of the SQL.
      */
-    protected $sqlExpressions = array();
+    protected $sqlExpressions = [];
     /**
      * @var string  The table name in database.
      */
@@ -86,18 +122,16 @@ abstract class ActiveRecord extends Base
     /**
      * @var array Stored the drity data of this object, when call "insert" or "update" function, will write this data into database.
      */
-    public $dirty = array();
+    public $dirty = [];
     /**
      * @var array Stored the params will bind to SQL when call PDOStatement::execute(),
      */
-    public $params = array();
-    const BELONGS_TO = 'belongs_to';
-    const HAS_MANY = 'has_many';
-    const HAS_ONE = 'has_one';
+    public $params = [];
+    
     /**
      * @var array Stored the configure of the relation, or target of the relation.
      */
-    public $relations = array();
+    public $relations = [];
     /**
      * @var int The count of bind params, using this count and const "PREFIX" (:ph) to generate place holder in SQL.
      */
@@ -247,7 +281,7 @@ abstract class ActiveRecord extends Base
      * @param string $name The name of the relation, the array key when defind the relation.
      * @return mixed
      */
-    protected function & getRelation($name)
+    protected function &getRelation($name)
     {
         $relation = $this->relations[$name];
         if ($relation instanceof self || (is_array($relation) && $relation[0] instanceof self)) {
@@ -308,27 +342,6 @@ abstract class ActiveRecord extends Base
         return implode(' ', $sqls);
     }
     /**
-     * magic function to make calls witch in function mapping stored in $operators and $sqlPart.
-     * also can call function of PDO object.
-     * @param string $name function name
-     * @param array $args The arguments of the function.
-     * @return mixed Return the result of callback or the current object to make chain method calls.
-     */
-    public function __call($name, $args)
-    {
-        if (is_callable($callback = array(self::$db,$name))) {
-            return call_user_func_array($callback, $args);
-        }
-        if (in_array($name = strtolower($name), array_keys(self::$operators))) {
-            $this->addCondition($args[0], self::$operators[$name], isset($args[1]) ? $args[1] : null, (is_string(end($args)) && 'or' === strtolower(end($args))) ? 'OR' : 'AND');
-        } elseif (in_array($name= str_replace('by', '', $name), array_keys(self::$sqlParts))) {
-            $this->$name = new Expressions(array('operator'=>self::$sqlParts[$name], 'target' => implode(', ', $args)));
-        } else {
-            throw new Exception("Method $name not exist.");
-        }
-        return $this;
-    }
-    /**
      * make wrap when build the SQL expressions of WHWRE.
      * @param string $op If give this param will build one WrapExpressions include the stored expressions add into WHWRE. otherwise wil stored the expressions into array.
      * @return ActiveRecord return $this, can using chain method calls.
@@ -369,16 +382,26 @@ abstract class ActiveRecord extends Base
      * @param string $field The field name, the source of Expressions
      * @param string $operator
      * @param mixed $value the target of the Expressions
-     * @param string $op the operator to concat this Expressions into WHERE or SET statment.
+     * @param string $op the operator to concat this Expressions into WHERE or SET statement.
      * @param string $name The Expression will contact to.
      */
     public function addCondition($field, $operator, $value, $op = 'AND', $name = 'where')
     {
         $value = $this->_filterParam($value);
-        if ($exp =  new Expressions(array('source'=>('where' == $name? $this->table.'.' : '' ) .$field, 'operator'=>$operator, 'target'=>(is_array($value)
-            ? new WrapExpressions('between' === strtolower($operator)
-                ? array('target' => $value, 'start' => ' ', 'end' => ' ', 'delimiter' => ' AND ')
-                : array('target' => $value)) : $value)))) {
+		$exp = new Expressions([
+			'source' => ('where' == $name ? $this->table.'.' : '') . $field, 
+			'operator'=>$operator, 
+			'target'=> (
+				is_array($value)
+				? new WrapExpressions(
+					'between' === strtolower($operator)
+					? [ 'target' => $value, 'start' => ' ', 'end' => ' ', 'delimiter' => ' AND ' ]
+					: [ 'target' => $value ]
+					)
+				: $value
+			)
+		]);
+        if($exp) {
             if (!$this->wrap) {
                 $this->_addCondition($exp, $op, $name);
             } else {
@@ -426,6 +449,37 @@ abstract class ActiveRecord extends Base
         } else {
             $this->$name->target = new Expressions(array('source'=>$this->$name->target, 'operator'=>$operator, 'target'=>$exp));
         }
+    }
+	/**
+     * magic function to make calls witch in function mapping stored in $operators and $sqlPart.
+     * also can call function of PDO object.
+     * @param string $name function name
+     * @param array $args The arguments of the function.
+     * @return mixed Return the result of callback or the current object to make chain method calls.
+     */
+    public function __call($name, $args)
+    {
+        if (is_callable($callback = array(self::$db,$name))) {
+            return call_user_func_array($callback, $args);
+        }
+		$name= str_replace('by', '', $name);
+        if (in_array($name, array_keys(self::$operators))) {
+			$field = $args[0];
+			$operator = self::$operators[$name];
+			$value = isset($args[1]) ? $args[1] : null;
+			$last_arg = end($args);
+			$and_or_or = is_string($last_arg) && strtolower($last_arg) === 'or' ? 'OR' : 'AND';
+
+            $this->addCondition($field, $operator, $value, $and_or_or);
+        } elseif (in_array($name, array_keys(self::$sqlParts))) {
+            $this->{$name} = new Expressions([
+				'operator'=>self::$sqlParts[$name], 
+				'target' => implode(', ', $args)
+			]);
+        } else {
+            throw new Exception("Method {$name} not exist.");
+        }
+        return $this;
     }
     /**
      * magic function to SET values of the current object.
