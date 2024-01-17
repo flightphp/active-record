@@ -27,7 +27,7 @@ $user->insert();
 function to find one record and assign in to current object. If call this function using $id param, will find record by using this id. If not set, just find the first record in database. if find record, assign in to current object and return it, other wise return "false".
 
 ```php
-    $user->notnull('id')->orderby('id desc')->find();
+$user->notnull('id')->orderby('id desc')->find();
 ```
 
 #### findAll() : array

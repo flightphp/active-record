@@ -1,20 +1,31 @@
 <?php
 
-namespace flight\test;
+namespace flight\tests;
 
 use Exception;
 use flight\ActiveRecord;
+use flight\tests\classes\Contact;
+use flight\tests\classes\User;
 use PDO;
 
 class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 {
-    public function setUp(): void
+    public static function setUpBeforeClass(): void
     {
         require_once __DIR__ . '/classes/User.php';
         require_once __DIR__ . '/classes/Contact.php';
 
         @unlink('test.db');
         ActiveRecord::setDb(new PDO('sqlite:test.db'));
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        @unlink('test.db');
+    }
+
+    public function setUp(): void
+    {
         ActiveRecord::execute("CREATE TABLE IF NOT EXISTS user (
             id INTEGER PRIMARY KEY, 
             name TEXT, 
@@ -26,6 +37,12 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
             email TEXT,
             address TEXT
         );");
+    }
+
+    public function tearDown(): void
+    {
+        ActiveRecord::execute("DROP TABLE IF EXISTS contact;");
+        ActiveRecord::execute("DROP TABLE IF EXISTS user;");
     }
 
     public function testError()
@@ -47,59 +64,58 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $user->password = md5('demo');
         $user->insert();
         $this->assertGreaterThan(0, $user->id);
-        return $user;
     }
-    /**
-     * @depends testInsertUser
-     */
-    public function testEdittUser($user)
+
+    public function testEditUser()
     {
+        $original_password = md5('demo');
+        $user = new User();
+        $user->name = 'demo';
+        $user->password = $original_password;
+        $user->insert();
+        $original_id = $user->id;
         $user->name = 'demo1';
         $user->password = md5('demo1');
         $user->update();
         $this->assertGreaterThan(0, $user->id);
-        return $user;
+        $this->assertEquals('demo1', $user->name);
+        $this->assertNotEquals($original_password, $user->password);
+        $this->assertEquals($original_id, $user->id);
     }
-    /**
-     * @depends testInsertUser
-     */
-    public function testInsertContact($user)
+
+    public function testRelations()
     {
+        $user = new User();
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
         $contact = new Contact();
-        $contact->address = 'test';
-        $contact->email = 'test@demo.com';
         $contact->user_id = $user->id;
+        $contact->email = 'test@amail.com';
+        $contact->address = 'test address';
         $contact->insert();
-        $this->assertGreaterThan(0, $contact->id);
-        return $contact;
-    }
-    /**
-     * @depends testInsertContact
-     */
-    public function testEditContact($contact)
-    {
-        $contact->address = 'test1';
-        $contact->email = 'test1@demo.com';
-        $contact->update();
-        $this->assertGreaterThan(0, $contact->id);
-        return $contact;
-    }
-    /**
-     * @depends testInsertContact
-     */
-    public function testRelations($contact)
-    {
+        
         $this->assertEquals($contact->user->id, $contact->user_id);
         $this->assertEquals($contact->user->contact->id, $contact->id);
         $this->assertEquals($contact->user->contacts[0]->id, $contact->id);
         $this->assertGreaterThan(0, count($contact->user->contacts));
         return $contact;
     }
-    /**
-     * @depends testRelations
-     */
-    public function testRelationsBackRef($contact)
+    
+    public function testRelationsBackRef()
     {
+        $user = new User();
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
+        $contact = new Contact();
+        $contact->user_id = $user->id;
+        $contact->email = 'test@amail.com';
+        $contact->address = 'test address';
+        $contact->insert();
+
         $this->assertEquals($contact->user->contact === $contact, false);
         $this->assertEquals($contact->user_with_backref->contact === $contact, true);
         $user = $contact->user;
@@ -108,24 +124,40 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
         return $contact;
     }
-    /**
-     * @depends testInsertContact
-     */
-    public function testJoin($contact)
+    
+    public function testJoin()
     {
         $user = new User();
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
+        $contact = new Contact();
+        $contact->user_id = $user->id;
+        $contact->email = 'test@amail.com';
+        $contact->address = 'test address';
+        $contact->insert();
+
         $user->select('*, c.email, c.address')->join('contact as c', 'c.user_id = user.id')->find();
         // email and address will stored in user data array.
         $this->assertEquals($user->id, $contact->user_id);
         $this->assertEquals($user->email, $contact->email);
         $this->assertEquals($user->address, $contact->address);
     }
-    /**
-     * @depends testInsertContact
-     */
-    public function testQuery($contact)
+    
+    public function testQuery()
     {
         $user = new User();
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
+        $contact = new Contact();
+        $contact->user_id = $user->id;
+        $contact->email = 'test@amail.com';
+        $contact->address = 'test address';
+        $contact->insert();
+
         $user->isnotnull('id')->eq('id', 1)->lt('id', 2)->gt('id', 0)->find();
         $this->assertGreaterThan(0, $user->id);
         $this->assertSame(array(), $user->dirty);
@@ -140,11 +172,19 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $user->reset()->isnotnull('id')->between('id', array(0, 2))->find();
         $this->assertGreaterThan(0, $user->id);
     }
-    /**
-     * @depends testRelations
-     */
-    public function testDelete($contact)
+    
+    public function testDelete()
     {
+        $user = new User();
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
+        $contact = new Contact();
+        $contact->user_id = $user->id;
+        $contact->email = 'test@amail.com';
+        $contact->address = 'test address';
+        $contact->insert();
         $cid = $contact->id;
         $uid = $contact->user_id;
         $new_contact = new Contact();

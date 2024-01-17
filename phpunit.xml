@@ -8,6 +8,7 @@
          convertWarningsToExceptions="true"
          processIsolation="false"
          stopOnFailure="true"
+		 executionOrder="random"
          bootstrap="vendor/autoload.php"
         >
     <testsuites>
@@ -17,7 +18,7 @@
     </testsuites>
     <filter>
         <whitelist>
-            <directory>src/</file>
+            <directory>src/</directory>
         </whitelist>
     </filter>
 </phpunit>

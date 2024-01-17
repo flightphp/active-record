@@ -3,3 +3,4 @@ build/
 composer.lock
 test.db
 .vscode/
+coverage/
