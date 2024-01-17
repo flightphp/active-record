@@ -1,48 +1,51 @@
-# activerecord
-[![Build Status](https://travis-ci.org/bephp/activerecord.svg?branch=master)](https://travis-ci.org/bephp/activerecord)
-[![Coverage Status](https://coveralls.io/repos/github/bephp/activerecord/badge.svg?branch=master)](https://coveralls.io/github/bephp/activerecord?branch=master)
-[![Latest Stable Version](https://poser.pugx.org/bephp/activerecord/v/stable)](https://packagist.org/packages/bephp/activerecord) [![Total Downloads](https://poser.pugx.org/bephp/activerecord/downloads)](https://packagist.org/packages/bephp/activerecord) [![Latest Unstable Version](https://poser.pugx.org/bephp/activerecord/v/unstable)](https://packagist.org/packages/bephp/activerecord) [![License](https://poser.pugx.org/bephp/activerecord/license)](https://packagist.org/packages/bephp/activerecord)
+# FlightPHP Active Record 
+[![License](https://poser.pugx.org/flightphp/active-record/license)](https://packagist.org/packages/flightphp/active-record)
 
-micro activerecord library in PHP(only 400 lines with comments), support chain calls and relations(HAS_ONE, HAS_MANY, BELONGS_TO).
-
-> [中文版](https://github.com/bephp/activerecord/blob/master/README.zh-CN.md).
-
-## Documentation
-[Documentation](https://bephp.github.io/activerecord/)
+Micro Active Record library in PHP, support chain calls and relations(HAS_ONE, HAS_MANY, BELONGS_TO).
 
 ## API Reference
 ### CRUD functions
 #### setDb(\PDO  $db) 
 set the DB connection.
 
-    ActiveRecord::setDb(new PDO('sqlite:test.db'));
+```php
+ActiveRecord::setDb(new PDO('sqlite:test.db'));
+```
 
 #### insert() : boolean|\ActiveRecord
 function to build insert SQL, and insert current record into database.
 if insert success return current object, other wise return false.
 
-    $user = new User();
-    $user->name = 'demo';
-    $user->password = md5('demo');
-    $user->insert();
+```php
+$user = new User();
+$user->name = 'demo';
+$user->password = md5('demo');
+$user->insert();
+```
 
 #### find(integer  $id = null) : boolean|\ActiveRecord
 function to find one record and assign in to current object. If call this function using $id param, will find record by using this id. If not set, just find the first record in database. if find record, assign in to current object and return it, other wise return "false".
 
+```php
     $user->notnull('id')->orderby('id desc')->find();
+```
 
 #### findAll() : array
 function to find all records in database. return array of ActiveRecord
 
-    $user->findAll();
+```php
+$user->findAll();
+```
 
 #### update() : boolean|\ActiveRecord
 function to build update SQL, and update current record in database, just write the dirty data into database.
 if update success return current object, other wise return false.
 
-    $user->notnull('id')->orderby('id desc')->find();
-    $user->email = 'test@example.com';
-    $user->update();
+```php
+$user->notnull('id')->orderby('id desc')->find();
+$user->email = 'test@example.com';
+$user->update();
+```
 
 #### delete() : boolean
 function to delete current record in database. 
@@ -57,85 +60,104 @@ function to SET or RESET the dirty data. The dirty data will be set, or empty ar
 #### select()
 function to set the select columns.
 
-    $user->select('id', 'name')->find();
+```php
+$user->select('id', 'name')->find();
+```
 
 #### from()
 function to set the table to find record
 
-    $user->select('id', 'name')->from('user')->find();
+```php
+$user->select('id', 'name')->from('user')->find();
+```
 
 #### join()
 function to set the table to find record
 
-    $user->join('contact', 'contact.user_id = user.id')->find();
+```php
+$user->join('contact', 'contact.user_id = user.id')->find();
+```
 
 #### where()
 function to set where conditions
 
-    $user->where('id=1 AND name="demo"')->find();
+```php
+$user->where('id=1 AND name="demo"')->find();
+```
 
 #### group()/groupby()
 
-    $user->select('count(1) as count')->groupby('name')->findAll();
-    
+```php
+$user->select('count(1) as count')->groupby('name')->findAll();
+```
+
 #### order()/orderby()
 
-    $user->orderby('name DESC')->find();
-    
+```php
+$user->orderby('name DESC')->find();
+```
+
 #### limit()
 
-    $user->orderby('name DESC')->limit(0, 1)->find();
+```php
+$user->orderby('name DESC')->limit(0, 1)->find();
+```
 
 ### WHERE conditions
 #### equal()/eq()
 
-    $user->eq('id', 1)->find();
+```php
+$user->eq('id', 1)->find();
+```
 
 #### notequal()/ne()
 
-    $user->ne('id', 1)->find();
-    
+```php
+$user->ne('id', 1)->find();
+```
+
 #### greaterthan()/gt()
 
-    $user->gt('id', 1)->find();
+```php
+$user->gt('id', 1)->find();
+```
 
 #### lessthan()/lt()
-
-    $user->lt('id', 1)->find();
-
+```php
+$user->lt('id', 1)->find();
+```
 #### greaterthanorequal()/ge()/gte()
-
-    $user->ge('id', 1)->find();
-
+```php
+$user->ge('id', 1)->find();
+```
 #### lessthanorequal()/le()/lte()
-
-    $user->le('id', 1)->find();
-
+```php
+$user->le('id', 1)->find();
+```
 #### like()
-
-    $user->like('name', 'de')->find();
-
+```php
+$user->like('name', 'de')->find();
+```
 #### in()
-
-    $user->in('id', [1, 2])->find();
-
+```php
+$user->in('id', [1, 2])->find();
+```
 #### notin()
-
-    $user->notin('id', [1,3])->find();
-
+```php
+$user->notin('id', [1,3])->find();
+```
 #### isnull()
-
-    $user->isnull('id')->find();
-
+```php
+$user->isnull('id')->find();
+```
 #### isnotnull()/notnull()
-
-    $user->isnotnull('id')->find();
-
+```php
+$user->isnotnull('id')->find();
+```
 ## Install
-
-    composer require bephp/activerecord 
-
-There's one [Blog demo](https://github.com/bephp/blog), work with [Router](https://github.com/bephp/router) and [MicoTpl](https://github.com/bephp/microtpl).
+```php
+composer require bephp/activerecord 
+```
 
 ## Demo
 ### Include base class ActiveRecord
