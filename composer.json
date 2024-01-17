@@ -1,19 +1,37 @@
 {
-    "name": "bephp/activerecord",
+    "name": "flightphp/active-record",
     "type": "library",
-    "description": "micro activerecord library in PHP(only 400 lines with comments), support chain calls and relations(HAS_ONE, HAS_MANY, BELONGS_TO).",
-    "keywords": ["activerecord", "orm", "pdo", "relation", "micro", "database"],
+    "description": "Micro Active Record library in PHP, support chain calls and relations(HAS_ONE, HAS_MANY, BELONGS_TO).",
+    "keywords": ["active record", "orm", "pdo", "relation", "micro", "database"],
     "homepage": "http://lloydzhou.github.io/activerecord/",
     "license": "MIT",
+	"authors": [
+        {
+            "name": "Lloyd Zhou",
+			"email": "lloydzhou@qq.com",
+            "homepage": "https://lloydzhou.github.io/",
+            "role": "Original Developer"
+        },
+        {
+            "name": "n0nag0n",
+            "email": "n0nag0n@sky-9.com",
+            "role": "Maintainer"
+        }
+    ],
     "require": {
         "php": ">=5.3.0"
     },
     "require-dev": {
-        "phpdocumentor/phpdocumentor": "^2.8",
-        "satooshi/php-coveralls":"*",
-        "phpunit/phpunit": "*"
+        "phpunit/phpunit": "^9.5",
+        "squizlabs/php_codesniffer": "^3.8"
     },
-    "autoload": {
-        "files": [ "ActiveRecord.php" ]
-     }
+	"autoload": {
+		"psr-4": {"flight\\": "src/"}
+	},
+	 "scripts": {
+		"test": "phpunit",
+		"test-coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-html=coverage --coverage-clover=clover.xml && vendor/bin/coverage-check clover.xml 100",
+		"beautify": "phpcbf --standard=phpcs.xml",
+		"phpcs": "phpcs --standard=phpcs.xml"
+	 }
 }

@@ -8,28 +8,16 @@
          convertWarningsToExceptions="true"
          processIsolation="false"
          stopOnFailure="true"
-         syntaxCheck="false"
          bootstrap="vendor/autoload.php"
         >
     <testsuites>
         <testsuite name="ActiveRecord Tests">
-            <directory>./test/</directory>
+            <directory>tests/</directory>
         </testsuite>
     </testsuites>
-    <logging>
-        <log type="coverage-clover" target="build/logs/clover.xml" />
-        <log type="coverage-text" target="php://stdout" showUncoveredFiles="true"/>
-    </logging>
-
     <filter>
         <whitelist>
-            <directory>./</directory>
-            <exclude>
-                <directory>./vendor</directory>
-                <directory>./test</directory>
-                <file>./run.php</file>
-                <file>./test.php</file>
-            </exclude>
+            <directory>src/</file>
         </whitelist>
     </filter>
 </phpunit>
