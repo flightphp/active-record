@@ -42,6 +42,19 @@ use PDO;
  * @method self isNull(string $field, string $operator = 'AND') Is Null
  * @method self isNotNull(string $field, string $operator = 'AND') Is Not Null
  * @method self notNull(string $field, string $operator = 'AND') Not Null
+ * 
+ * @method self select(string $field, [...$field2]) Select
+ * @method self from(string $table) From
+ * @method self set(string $field, mixed $value, [...$field2]) Set
+ * @method self where(string $sql_conditions) Where
+ * @method self group(string $field, [...$field2]) Group By
+ * @method self groupBy(string $field, [...$field2]) Group By
+ * @method self having(string $sql_conditions) Having
+ * @method self order(string $field, [...$field2]) Order By
+ * @method self orderBy(string $field, [...$field2]) Order By
+ * @method self limit(int $limit) Limit
+ * @method self offset(int $offset) Offset
+ * @method self top(int $top) Top
  */
 abstract class ActiveRecord extends Base
 {
@@ -519,7 +532,7 @@ abstract class ActiveRecord extends Base
             return call_user_func_array($callback, $args);
         }
 		$name= str_replace('by', '', $name);
-        if (in_array($name, array_keys($this->operators))) {
+        if (isset($this->operators[$name]) === true) {
 			$field = $args[0];
 			$operator = $this->operators[$name];
 			$value = isset($args[1]) ? $args[1] : null;
@@ -573,12 +586,12 @@ abstract class ActiveRecord extends Base
      */
     public function &__get($var)
     {
-        if (array_key_exists($var, $this->sqlExpressions)) {
-            return  $this->sqlExpressions[$var];
-        } elseif (array_key_exists($var, $this->relations)) {
+        if (isset($this->sqlExpressions[$var]) === true) {
+            return $this->sqlExpressions[$var];
+        } elseif (isset($this->relations[$var]) === true) {
             return $this->getRelation($var);
         } else {
-            return  parent::__get($var);
+            return parent::__get($var);
         }
     }
 }
