@@ -164,6 +164,13 @@ abstract class ActiveRecord extends Base
     protected array $relations = [];
 
     /**
+     * These are variables that are custom to the model, but not part of the database
+     *
+     * @var array
+     */
+    protected array $custom_data = [];
+
+    /**
      * @var int The count of bind params, using this count and const "PREFIX" (:ph) to generate place holder in SQL.
      */
     protected int $count = 0;
@@ -180,6 +187,92 @@ abstract class ActiveRecord extends Base
         parent::__construct($config);
     }
     
+    /**
+     * magic function to make calls witch in function mapping stored in $operators and $sqlPart.
+     * also can call function of PDO object.
+     * @param string $name function name
+     * @param array $args The arguments of the function.
+     * @return mixed Return the result of callback or the current object to make chain method calls.
+     */
+    public function __call($name, $args)
+    {
+        $name = str_ireplace('by', '', $name);
+        if (isset($this->operators[$name]) === true) {
+            $field = $args[0];
+            $operator = $this->operators[$name];
+            $value = isset($args[1]) ? $args[1] : null;
+            $last_arg = end($args);
+            $and_or_or = is_string($last_arg) && strtolower($last_arg) === 'or' ? 'OR' : 'AND';
+
+            $this->addCondition($field, $operator, $value, $and_or_or);
+        } elseif (in_array($name, array_keys($this->sqlParts))) {
+            $this->{$name} = new Expressions([
+                'operator'=>$this->sqlParts[$name],
+                'target' => implode(', ', $args)
+            ]);
+        }
+        return $this;
+    }
+
+    /**
+     * magic function to SET values of the current object.
+     */
+    public function __set($var, $val)
+    {
+        if (array_key_exists($var, $this->sqlExpressions) || array_key_exists($var, $this->defaultSqlExpressions)) {
+            $this->sqlExpressions[$var] = $val;
+        } elseif (isset($this->relations[$var]) === true && $val instanceof self) {
+            $this->relations[$var] = $val;
+        } else {
+            $this->data[$var] = $val;
+            $this->dirty[$var] = $val;
+        }
+    }
+
+    /**
+     * magic function to UNSET values of the current object.
+     */
+    public function __unset($var)
+    {
+        if (array_key_exists($var, $this->sqlExpressions)) {
+            unset($this->sqlExpressions[$var]);
+        }
+        if (isset($this->data[$var])) {
+            unset($this->data[$var]);
+        }
+        if (isset($this->dirty[$var])) {
+            unset($this->dirty[$var]);
+        }
+    }
+
+    /**
+     * magic function to GET the values of current object.
+     */
+    public function &__get($var)
+    {
+        if (isset($this->sqlExpressions[$var]) === true) {
+            return $this->sqlExpressions[$var];
+        } elseif (isset($this->relations[$var]) === true) {
+            return $this->getRelation($var);
+        } elseif (isset($this->custom_data[$var]) === true) {
+            return $this->custom_data[$var];
+        } else {
+            return parent::__get($var);
+        }
+    }
+
+    /**
+     * This is for setting a custom property on this model, that is not part of the database
+     *
+     * @param string $key   The key
+     * @param mixed $value any value
+     * @return void
+     */
+    public function setCustomData(string $key, $value): void
+    {
+        $this->custom_data[$key] = $value;
+    }
+
     /**
      * function to reset the $params and $sqlExpressions.
      * @return ActiveRecord return $this, can using chain method calls.
@@ -516,77 +609,6 @@ abstract class ActiveRecord extends Base
             $this->{$name} = new Expressions(['operator' => strtoupper($name) , 'target' => $expressions]);
         } else {
             $this->{$name}->target = new Expressions(['source' => $this->$name->target, 'operator' => $operator, 'target' => $expressions]);
-        }
-    }
-    /**
-     * magic function to make calls witch in function mapping stored in $operators and $sqlPart.
-     * also can call function of PDO object.
-     * @param string $name function name
-     * @param array $args The arguments of the function.
-     * @return mixed Return the result of callback or the current object to make chain method calls.
-     */
-    public function __call($name, $args)
-    {
-        $name = str_ireplace('by', '', $name);
-        if (isset($this->operators[$name]) === true) {
-            $field = $args[0];
-            $operator = $this->operators[$name];
-            $value = isset($args[1]) ? $args[1] : null;
-            $last_arg = end($args);
-            $and_or_or = is_string($last_arg) && strtolower($last_arg) === 'or' ? 'OR' : 'AND';
-
-            $this->addCondition($field, $operator, $value, $and_or_or);
-        } elseif (in_array($name, array_keys($this->sqlParts))) {
-            $this->{$name} = new Expressions([
-                'operator'=>$this->sqlParts[$name],
-                'target' => implode(', ', $args)
-            ]);
-        }
-        return $this;
-    }
-
-    /**
-     * magic function to SET values of the current object.
-     */
-    public function __set($var, $val)
-    {
-        if (array_key_exists($var, $this->sqlExpressions) || array_key_exists($var, $this->defaultSqlExpressions)) {
-            $this->sqlExpressions[$var] = $val;
-        } elseif (isset($this->relations[$var]) === true && $val instanceof self) {
-            $this->relations[$var] = $val;
-        } else {
-            $this->data[$var] = $val;
-            $this->dirty[$var] = $val;
-        }
-    }
-
-    /**
-     * magic function to UNSET values of the current object.
-     */
-    public function __unset($var)
-    {
-        if (array_key_exists($var, $this->sqlExpressions)) {
-            unset($this->sqlExpressions[$var]);
-        }
-        if (isset($this->data[$var])) {
-            unset($this->data[$var]);
-        }
-        if (isset($this->dirty[$var])) {
-            unset($this->dirty[$var]);
-        }
-    }
-
-    /**
-     * magic function to GET the values of current object.
-     */
-    public function &__get($var)
-    {
-        if (isset($this->sqlExpressions[$var]) === true) {
-            return $this->sqlExpressions[$var];
-        } elseif (isset($this->relations[$var]) === true) {
-            return $this->getRelation($var);
-        } else {
-            return parent::__get($var);
         }
     }
 }

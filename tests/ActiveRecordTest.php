@@ -63,4 +63,13 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         unset($record->where);
         $this->assertEquals($record->where, null);
     }
+
+    public function testCustomData()
+    {
+        $pdo_mock = $this->createStub(PDO::class);
+        $record = new class($pdo_mock) extends ActiveRecord {
+        };
+        $record->setCustomData('test', 'something');
+        $this->assertEquals('something', $record->test);
+    }
 }
