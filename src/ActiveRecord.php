@@ -19,7 +19,7 @@ use PDO;
  * Simple implement of active record in PHP.<br />
  * Using magic function to implement more smarty functions.<br />
  * Can using chain method calls, to build concise and compactness program.<br />
- * 
+ *
  * @method self equal(string $field, mixed $value, string $operator = 'AND') Equal operator
  * @method self eq(string $field, mixed $value, string $operator = 'AND') Equal operator
  * @method self notEqual(string $field, mixed $value, string $operator = 'AND') Not Equal operator
@@ -42,7 +42,7 @@ use PDO;
  * @method self isNull(string $field, string $operator = 'AND') Is Null
  * @method self isNotNull(string $field, string $operator = 'AND') Is Not Null
  * @method self notNull(string $field, string $operator = 'AND') Not Null
- * 
+ *
  * @method self select(string $field, [...$field2]) Select
  * @method self from(string $table) From
  * @method self set(string $field, mixed $value, [...$field2]) Set
@@ -58,10 +58,10 @@ use PDO;
  */
 abstract class ActiveRecord extends Base
 {
-	public const BELONGS_TO = 'belongs_to';
+    public const BELONGS_TO = 'belongs_to';
     public const HAS_MANY = 'has_many';
     public const HAS_ONE = 'has_one';
-	public const PREFIX = ':ph';
+    public const PREFIX = ':ph';
 
     /**
      * @var array mapping the function name and the operator, to build Expressions in WHERE condition.
@@ -79,13 +79,13 @@ abstract class ActiveRecord extends Base
         'lessThanOrEqual' => '<=', 'le' => '<=','lte' => '<=',
         'between' => 'BETWEEN',
         'like' => 'LIKE',
-		'notLike' => 'NOT LIKE',
+        'notLike' => 'NOT LIKE',
         'in' => 'IN',
         'notIn' => 'NOT IN',
         'isNull' => 'IS NULL',
-        'isNotNull' => 'IS NOT NULL', 
-		'notNull' => 'IS NOT NULL',
-	];
+        'isNotNull' => 'IS NOT NULL',
+        'notNull' => 'IS NOT NULL',
+    ];
     /**
      * @var array Part of SQL, maping the function name and the operator to build SQL Part.
      * <pre>call function like this:
@@ -102,41 +102,41 @@ abstract class ActiveRecord extends Base
         'having' => 'HAVING',
         'order' => 'ORDER BY','orderBy' => 'ORDER BY',
         'limit' => 'LIMIT',
-		'offset' => 'OFFSET',
+        'offset' => 'OFFSET',
         'top' => 'TOP',
     ];
     /**
      * @var array property to stored the default Sql Expressions values.
      */
-    protected array $defaultSqlExpressions = [ 
-		'expressions' => [], 
-		'wrap' => false,
-        'select'=>null, 
-		'insert'=>null, 
-		'update'=>null, 
-		'set' => null, 
-		'delete'=>'DELETE ', 
-		'join' => null,
-        'from'=>null, 
-		'values' => null, 
-		'where'=>null, 
-		'having'=>null, 
-		'limit'=>null, 
-		'order'=>null, 
-		'group' => null 
-	];
+    protected array $defaultSqlExpressions = [
+        'expressions'   => [],
+        'wrap'          => false,
+        'select'        => null,
+        'insert'        => null,
+        'update'        => null,
+        'set'           => null,
+        'delete'        => 'DELETE ',
+        'join'          => null,
+        'from'          => null,
+        'values'        => null,
+        'where'         => null,
+        'having'        => null,
+        'limit'         => null,
+        'order'         => null,
+        'group'         => null
+    ];
 
     /**
      * @var array Stored the Expressions of the SQL.
      */
     protected array $sqlExpressions = [];
 
-	/**
-	 * PDO connection
-	 *
-	 * @var PDO
-	 */
-	protected PDO $pdo;
+    /**
+     * PDO connection
+     *
+     * @var PDO
+     */
+    protected PDO $pdo;
 
     /**
      * @var string  The table name in database.
@@ -168,17 +168,17 @@ abstract class ActiveRecord extends Base
      */
     protected int $count = 0;
 
-	/**
-	 * The construct
-	 *
-	 * @param PDO   $pdo    PDO object
-	 * @param array $config Manipulate any property in the object
-	 */
-	public function __construct(PDO $pdo, array $config = [])
-	{
-		$this->pdo = $pdo;
-		parent::__construct($config);
-	}
+    /**
+     * The construct
+     *
+     * @param PDO   $pdo    PDO object
+     * @param array $config Manipulate any property in the object
+     */
+    public function __construct(PDO $pdo, array $config = [])
+    {
+        $this->pdo = $pdo;
+        parent::__construct($config);
+    }
     
     /**
      * function to reset the $params and $sqlExpressions.
@@ -197,12 +197,12 @@ abstract class ActiveRecord extends Base
      */
     public function dirty(array $dirty = [])
     {
-		$this->dirty = $dirty;
+        $this->dirty = $dirty;
         $this->data = array_merge($this->data, $dirty);
         return $this;
     }
 
-	/**
+    /**
      * get the pdo connection.
      * @return PDO
      */
@@ -215,10 +215,10 @@ abstract class ActiveRecord extends Base
      * set the PDO connection.
      * @param PDO $pdo
      */
-    public function setPdo(PDO $pdo)
-    {
-        $this->pdo = $pdo;
-    }
+    // public function setPdo(PDO $pdo)
+    // {
+    //     $this->pdo = $pdo;
+    // }
 
     /**
      * function to find one record and assign in to current object.
@@ -260,10 +260,10 @@ abstract class ActiveRecord extends Base
         foreach ($this->dirty as $field => $value) {
             $this->addCondition($field, '=', $value, ',', 'set');
         }
-        if ($this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params)) {
-            return $this->dirty()->reset();
-        }
-        return false;
+
+        $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
+
+        return $this->dirty()->reset();
     }
     /**
      * function to build insert SQL, and insert current record into database.
@@ -276,15 +276,15 @@ abstract class ActiveRecord extends Base
         }
         $value = $this->filterParam($this->dirty);
         $this->insert = new Expressions([
-			'operator'=> 'INSERT INTO '. $this->table,
+            'operator'=> 'INSERT INTO '. $this->table,
             'target' => new WrapExpressions(['target' => array_keys($this->dirty)])
-		]);
+        ]);
         $this->values = new Expressions(['operator'=> 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
-        if ($this->execute($this->buildSql(['insert', 'values']), $this->params)) {
-            $this->{$this->primaryKey} = $this->pdo->lastInsertId();
-            return $this->dirty()->reset();
-        }
-        return false;
+
+        $this->execute($this->buildSql(['insert', 'values']), $this->params);
+
+        $this->{$this->primaryKey} = $this->pdo->lastInsertId();
+        return $this->dirty()->reset();
     }
     /**
      * helper function to exec sql.
@@ -315,20 +315,18 @@ abstract class ActiveRecord extends Base
      */
     public function query(string $sql, array $param = [], ActiveRecord $obj = null, bool $single = false)
     {
-        if ($sth = $this->pdo->prepare($sql)) {
-            $called_class = get_called_class();
-            $sth->setFetchMode(PDO::FETCH_INTO, ($obj ? $obj : new $called_class ));
-            $sth->execute($param);
-            if ($single) {
-                return $sth->fetch(PDO::FETCH_INTO) ? $obj->dirty() : false;
-            }
-            $result = [];
-            while ($obj = $sth->fetch(PDO::FETCH_INTO)) {
-                $result[] = clone $obj->dirty();
-            }
-            return $result;
+        $sth = $this->pdo->prepare($sql);
+        $called_class = get_called_class();
+        $sth->setFetchMode(PDO::FETCH_INTO, ($obj ? $obj : new $called_class ));
+        $sth->execute($param);
+        if ($single) {
+            return $sth->fetch() ? $obj->dirty() : false;
         }
-        return false;
+        $result = [];
+        while ($obj = $sth->fetch()) {
+            $result[] = clone $obj->dirty();
+        }
+        return $result;
     }
     /**
      * helper function to get relation of this object.
@@ -360,8 +358,6 @@ abstract class ActiveRecord extends Base
             }
         } elseif ((!$relation instanceof self) && self::BELONGS_TO == $relation[0]) {
             $obj->eq($obj->primaryKey, $this->{$relation[2]})->find() && $backref && $obj->__set($backref, $this);
-        } else {
-            throw new Exception("Relation $name not found.");
         }
         return $this->relations[$name];
     }
@@ -383,7 +379,7 @@ abstract class ActiveRecord extends Base
             $sql_statement = (null !== $object->$sql_statement) ? $object->$sql_statement. ' ' : '';
         }
 
-		return $sql_statement;
+        return $sql_statement;
     }
 
     /**
@@ -393,24 +389,27 @@ abstract class ActiveRecord extends Base
      */
     protected function buildSql(array $sql_statements = []): string
     {
-		foreach($sql_statements as &$sql) {
-			$sql = $this->buildSqlCallback($sql, $this);
-		}
+        foreach ($sql_statements as &$sql) {
+            $sql = $this->buildSqlCallback($sql, $this);
+        }
         //this code to debug info.
         //echo 'SQL: ', implode(' ', $sql_statements), "\n", "PARAMS: ", implode(', ', $this->params), "\n";
         return implode(' ', $sql_statements);
     }
     /**
      * make wrap when build the SQL expressions of WHERE.
-     * @param string $op If give this param will build one WrapExpressions include the stored expressions add into WHERE. otherwise wil stored the expressions into array.
-     * @return ActiveRecord return $this, can using chain method calls.
+     * @param string $op If give this param will build one WrapExpressions include the stored expressions add into WHERE. Otherwise will stored the expressions into array.
+     * @return ActiveRecord
      */
     public function wrap(?string $op = null)
     {
-        if (1 === func_num_args()) {
+        if ($op !== null) {
             $this->wrap = false;
             if (is_array($this->expressions) && count($this->expressions) > 0) {
-                $this->addConditionGroup(new WrapExpressions(['delimiter' => ' ','target'=>$this->expressions]), 'or' === strtolower($op) ? 'OR' : 'AND');
+                $this->addConditionGroup(new WrapExpressions([
+                    'delimiter' => ' ',
+                    'target' => $this->expressions
+                ]), 'or' === strtolower($op) ? 'OR' : 'AND');
             }
             $this->expressions = [];
         } else {
@@ -430,7 +429,7 @@ abstract class ActiveRecord extends Base
                 $this->params[$value[$key] = self::PREFIX. ++$this->count] = $val;
             }
         } elseif (is_string($value)) {
-			$ph = self::PREFIX. ++$this->count;
+            $ph = self::PREFIX. ++$this->count;
             $this->params[$ph] = $value;
             $value = $ph;
         }
@@ -448,22 +447,22 @@ abstract class ActiveRecord extends Base
     public function addCondition(string $field, string $operator, $value, string $delimiter = 'AND', string $name = 'where')
     {
         $value = $this->filterParam($value);
-		$name = strtolower($name);
-		$expressions = new Expressions([
-			'source' => ('where' === $name ? $this->table.'.' : '') . $field, 
-			'operator' => $operator, 
-			'target'=> (
-				is_array($value)
-				? new WrapExpressions(
-					'between' === strtolower($operator)
-					? [ 'target' => $value, 'start' => ' ', 'end' => ' ', 'delimiter' => ' AND ' ]
-					: [ 'target' => $value ]
-					)
-				: $value
-			)
-		]);
-        if($expressions) {
-            if (empty($this->wrap)) {
+        $name = strtolower($name);
+        $expressions = new Expressions([
+            'source' => ('where' === $name ? $this->table.'.' : '') . $field,
+            'operator' => $operator,
+            'target'=> (
+                is_array($value)
+                ? new WrapExpressions(
+                    'between' === strtolower($operator)
+                    ? [ 'target' => $value, 'start' => ' ', 'end' => ' ', 'delimiter' => ' AND ' ]
+                    : [ 'target' => $value ]
+                )
+                : $value
+            )
+        ]);
+        if ($expressions) {
+            if (!$this->wrap) {
                 $this->addConditionGroup($expressions, $delimiter, $name);
             } else {
                 $this->addExpression($expressions, $delimiter);
@@ -480,16 +479,16 @@ abstract class ActiveRecord extends Base
     public function join(string $table, string $on, string $type = 'LEFT')
     {
         $this->join = new Expressions([
-			'source' => $this->join ?? '', 
-			'operator' => $type. ' JOIN', 
-			'target' => new Expressions(
-					[
-						'source' => $table, 
-						'operator' => 'ON', 
-						'target' => $on
-					]
-				)
-			]);
+            'source' => $this->join ?? '',
+            'operator' => $type. ' JOIN',
+            'target' => new Expressions(
+                [
+                        'source' => $table,
+                        'operator' => 'ON',
+                        'target' => $on
+                    ]
+            )
+            ]);
         return $this;
     }
     /**
@@ -519,7 +518,7 @@ abstract class ActiveRecord extends Base
             $this->{$name}->target = new Expressions(['source' => $this->$name->target, 'operator' => $operator, 'target' => $expressions]);
         }
     }
-	/**
+    /**
      * magic function to make calls witch in function mapping stored in $operators and $sqlPart.
      * also can call function of PDO object.
      * @param string $name function name
@@ -528,25 +527,20 @@ abstract class ActiveRecord extends Base
      */
     public function __call($name, $args)
     {
-        if (is_callable($callback = [$this->pdo,$name])) {
-            return call_user_func_array($callback, $args);
-        }
-		$name= str_replace('by', '', $name);
+        $name = str_ireplace('by', '', $name);
         if (isset($this->operators[$name]) === true) {
-			$field = $args[0];
-			$operator = $this->operators[$name];
-			$value = isset($args[1]) ? $args[1] : null;
-			$last_arg = end($args);
-			$and_or_or = is_string($last_arg) && strtolower($last_arg) === 'or' ? 'OR' : 'AND';
+            $field = $args[0];
+            $operator = $this->operators[$name];
+            $value = isset($args[1]) ? $args[1] : null;
+            $last_arg = end($args);
+            $and_or_or = is_string($last_arg) && strtolower($last_arg) === 'or' ? 'OR' : 'AND';
 
             $this->addCondition($field, $operator, $value, $and_or_or);
         } elseif (in_array($name, array_keys($this->sqlParts))) {
             $this->{$name} = new Expressions([
-				'operator'=>$this->sqlParts[$name], 
-				'target' => implode(', ', $args)
-			]);
-        } else {
-            throw new Exception("Method {$name} not exist.");
+                'operator'=>$this->sqlParts[$name],
+                'target' => implode(', ', $args)
+            ]);
         }
         return $this;
     }
@@ -558,10 +552,11 @@ abstract class ActiveRecord extends Base
     {
         if (array_key_exists($var, $this->sqlExpressions) || array_key_exists($var, $this->defaultSqlExpressions)) {
             $this->sqlExpressions[$var] = $val;
-        } elseif (array_key_exists($var, $this->relations) && $val instanceof self) {
+        } elseif (isset($this->relations[$var]) === true && $val instanceof self) {
             $this->relations[$var] = $val;
         } else {
-            $this->dirty[$var] = $this->data[$var] = $val;
+            $this->data[$var] = $val;
+            $this->dirty[$var] = $val;
         }
     }
 
