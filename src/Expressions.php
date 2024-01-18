@@ -14,6 +14,9 @@ namespace flight;
  */
 class Expressions extends Base
 {
+	public $source;
+	public string $operator;
+	public $target;
     public function __toString()
     {
         return $this->source. ' '. $this->operator. ' '. $this->target;

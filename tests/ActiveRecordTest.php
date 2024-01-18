@@ -10,13 +10,14 @@ use PDO;
 
 class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 {
+	protected $ActiveRecord;
+
     public static function setUpBeforeClass(): void
     {
         require_once __DIR__ . '/classes/User.php';
         require_once __DIR__ . '/classes/Contact.php';
 
         @unlink('test.db');
-        ActiveRecord::setDb(new PDO('sqlite:test.db'));
     }
 
     public static function tearDownAfterClass(): void
@@ -26,12 +27,13 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
     public function setUp(): void
     {
-        ActiveRecord::execute("CREATE TABLE IF NOT EXISTS user (
+		$this->ActiveRecord = new class(new PDO('sqlite:test.db')) extends ActiveRecord {};
+        $this->ActiveRecord->execute("CREATE TABLE IF NOT EXISTS user (
             id INTEGER PRIMARY KEY, 
             name TEXT, 
             password TEXT 
         );");
-        ActiveRecord::execute("CREATE TABLE IF NOT EXISTS contact (
+        $this->ActiveRecord->execute("CREATE TABLE IF NOT EXISTS contact (
             id INTEGER PRIMARY KEY, 
             user_id INTEGER, 
             email TEXT,
@@ -41,15 +43,15 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
     public function tearDown(): void
     {
-        ActiveRecord::execute("DROP TABLE IF EXISTS contact;");
-        ActiveRecord::execute("DROP TABLE IF EXISTS user;");
+        $this->ActiveRecord->execute("DROP TABLE IF EXISTS contact;");
+        $this->ActiveRecord->execute("DROP TABLE IF EXISTS user;");
     }
 
     public function testError()
     {
         try {
-            ActiveRecord::$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            ActiveRecord::execute('CREATE TABLE IF NOT EXISTS');
+            $this->ActiveRecord->getPdo()->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->ActiveRecord->execute('CREATE TABLE IF NOT EXISTS');
         } catch (Exception $e) {
             $this->assertInstanceOf('PDOException', $e);
             $this->assertEquals('HY000', $e->getCode());
@@ -59,7 +61,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
     public function testInsert()
     {
-        $user = new User();
+        $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
@@ -67,7 +69,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     }
 
 	public function testInsertNoChanges() {
-		$user = new User();
+		$user = new User(new PDO('sqlite:test.db'));
 		$result = $user->insert();
 		$this->assertTrue($result);
 	}
@@ -75,7 +77,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     public function testEdit()
     {
         $original_password = md5('demo');
-        $user = new User();
+        $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
         $user->password = $original_password;
         $user->insert();
@@ -90,7 +92,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     }
 
 	public function testUpdateNoChanges() {
-		$user = new User();
+		$user = new User(new PDO('sqlite:test.db'));
 		$user->name = 'demo';
         $user->password = 'pass';
         $user->insert();
@@ -100,12 +102,12 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
     public function testRelations()
     {
-        $user = new User();
+        $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
 
-        $contact = new Contact();
+        $contact = new Contact(new PDO('sqlite:test.db'));
         $contact->user_id = $user->id;
         $contact->email = 'test@amail.com';
         $contact->address = 'test address';
@@ -120,12 +122,12 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     
     public function testRelationsBackRef()
     {
-        $user = new User();
+        $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
 
-        $contact = new Contact();
+        $contact = new Contact(new PDO('sqlite:test.db'));
         $contact->user_id = $user->id;
         $contact->email = 'test@amail.com';
         $contact->address = 'test address';
@@ -142,12 +144,12 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     
     public function testJoin()
     {
-        $user = new User();
+        $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
 
-        $contact = new Contact();
+        $contact = new Contact(new PDO('sqlite:test.db'));
         $contact->user_id = $user->id;
         $contact->email = 'test@amail.com';
         $contact->address = 'test address';
@@ -162,12 +164,16 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     
     public function testQuery()
     {
-        $user = new User();
+        $user = new class(new PDO('sqlite:test.db')) extends User {
+			public function getDirty() {
+				return $this->dirty;
+			}
+		};
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
 
-        $contact = new Contact();
+        $contact = new Contact(new PDO('sqlite:test.db'));
         $contact->user_id = $user->id;
         $contact->email = 'test@amail.com';
         $contact->address = 'test address';
@@ -175,13 +181,13 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
         $user->isNotNull('id')->eq('id', 1)->lt('id', 2)->gt('id', 0)->find();
         $this->assertGreaterThan(0, $user->id);
-        $this->assertSame([], $user->dirty);
+        $this->assertSame([], $user->getDirty());
         $user->name = 'testname';
-        $this->assertSame(array('name'=>'testname'), $user->dirty);
+        $this->assertSame(array('name'=>'testname'), $user->getDirty());
         $name = $user->name;
         $this->assertEquals('testname', $name);
         unset($user->name);
-        $this->assertSame(array(), $user->dirty);
+        $this->assertSame(array(), $user->getDirty());
         $user->reset()->isNotNull('id')->eq('id', 'aaa"')->wrap()->lt('id', 2)->gt('id', 0)->wrap('OR')->find();
         $this->assertGreaterThan(0, $user->id);
         $user->reset()->isNotNull('id')->between('id', array(0, 2))->find();
@@ -190,26 +196,26 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     
     public function testDelete()
     {
-        $user = new User();
+        $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
 
-        $contact = new Contact();
+        $contact = new Contact(new PDO('sqlite:test.db'));
         $contact->user_id = $user->id;
         $contact->email = 'test@amail.com';
         $contact->address = 'test address';
         $contact->insert();
         $cid = $contact->id;
         $uid = $contact->user_id;
-        $new_contact = new Contact();
-        $new_user = new User();
+        $new_contact = new Contact(new PDO('sqlite:test.db'));
+        $new_user = new User(new PDO('sqlite:test.db'));
         $this->assertEquals($cid, $new_contact->find($cid)->id);
         $this->assertEquals($uid, $new_user->eq('id', $uid)->find()->id);
         $this->assertTrue($contact->user->delete());
         $this->assertTrue($contact->delete());
-        $new_contact = new Contact();
-        $new_user = new User();
+        $new_contact = new Contact(new PDO('sqlite:test.db'));
+        $new_user = new User(new PDO('sqlite:test.db'));
         $this->assertFalse($new_contact->eq('id', $cid)->find());
         $this->assertFalse($new_user->find($uid));
     }

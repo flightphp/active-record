@@ -5,13 +5,17 @@ namespace flight;
 
 /**
  * Class WrapExpressions
+ * @property string|Expressions|array $target of this expression (required)
  */
 class WrapExpressions extends Expressions
 {
+
+	public string $start = '(';
+	public string $end = ')';
+	public string $delimiter = ',';
+
     public function __toString()
     {
-        $start = $this->start ? $this->start : '(';
-        $end = $this->end ? $this->end : ')';
-        return $start . implode(($this->delimiter ? $this->delimiter: ','), $this->target) . $end;
+        return $this->start . implode(($this->delimiter ? $this->delimiter: ','), $this->target) . $this->end;
     }
 }
