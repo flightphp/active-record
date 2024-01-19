@@ -16,7 +16,6 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
     {
         require_once __DIR__ . '/classes/User.php';
         require_once __DIR__ . '/classes/Contact.php';
-
         @unlink('test.db');
     }
 
@@ -72,8 +71,8 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
     public function testInsertNoChanges()
     {
         $user = new User(new PDO('sqlite:test.db'));
-        $result = $user->insert();
-        $this->assertTrue($result);
+        $insert_result = $user->insert();
+        $this->assertIsObject($insert_result);
     }
 
     public function testEdit()
@@ -99,9 +98,21 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->name = 'demo';
         $user->password = 'pass';
         $user->insert();
-        $result = $user->update();
-        $this->assertTrue($result);
+        $user_result = $user->update();
+        $this->assertIsObject($user_result);
     }
+
+	public function testSave() {
+		$user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'demo';
+        $user->password = 'pass';
+        $user->save(); // should have inserted
+		$insert_id = $user->id;
+		$user->name = 'new name';
+		$user->save();
+		$this->assertEquals($insert_id, $user->id);
+		$this->assertEquals('new name', $user->name);
+	}
 
     public function testRelations()
     {
@@ -191,9 +202,9 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('testname', $name);
         unset($user->name);
         $this->assertSame([], $user->getDirty());
-        $user->reset()->isNotNull('id')->eq('id', 'aaa"')->wrap()->lt('id', 2)->gt('id', 0)->wrap('OR')->find();
+        $user->isNotNull('id')->eq('id', 'aaa"')->wrap()->lt('id', 2)->gt('id', 0)->wrap('OR')->find();
         $this->assertGreaterThan(0, $user->id);
-        $user->reset()->isNotNull('id')->between('id', [0, 2])->find();
+        $user->isNotNull('id')->between('id', [0, 2])->find();
         $this->assertGreaterThan(0, $user->id);
     }
 
@@ -207,7 +218,7 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->password = md5('demo1');
         $user->insert();
 
-        $users = $user->reset()->isNotNull('id')->wrap('OR')->in('name', [ 'demo', 'demo1' ])->wrap('AND')->lt('id', 3)->gt('id', 0)->wrap('OR')->findAll();
+        $users = $user->isNotNull('id')->wrap('OR')->in('name', [ 'demo', 'demo1' ])->wrap('AND')->lt('id', 3)->gt('id', 0)->wrap('OR')->findAll();
         $this->assertGreaterThan(0, $users[0]->id);
         $this->assertGreaterThan(0, $users[1]->id);
     }
@@ -237,4 +248,61 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertFalse($new_contact->eq('id', $cid)->find());
         $this->assertFalse($new_user->find($uid));
     }
+
+	public function testFindEvents() {
+		$user = new class(new PDO('sqlite:test.db')) extends User {
+			public function beforeFind(self $self) {
+				// This will force it to pull this kind of query
+				// every time.
+				$self->eq('name', 'Bob');
+			}
+
+			public function afterFind(self $self) {
+				$self->password = 'joepassword';
+				$self->setCustomData('real_name', 'Joe');
+			}
+		};
+		$user->name = 'Bob';
+		$user->password = 'bobbytables';
+		$user->insert();
+		$user_record = $user->find();
+		$this->assertEquals('Joe', $user_record->real_name);
+		$this->assertEquals('joepassword', $user_record->password);
+	}
+
+	public function testInsertEvents() {
+		$user = new class(new PDO('sqlite:test.db')) extends User {
+			protected function beforeInsert(self $self) {
+				$self->password = 'defaultpassword';
+			}
+
+			protected function afterInsert(self $self) {
+				$self->name .= ' after insert';
+			}
+		};
+		$user->name = 'Bob';
+		$user->password = 'bobbytables';
+		$user->insert();
+		$this->assertEquals('Bob after insert', $user->name);
+		$this->assertEquals('defaultpassword', $user->password);
+	}
+
+	public function testLimit() {
+		$user = new User(new PDO('sqlite:test.db'));
+		$user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+		$user->insert();
+		$user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+		$user->insert();
+		$user->dirty([ 'name' => 'bob3', 'password' => 'pass3' ]);
+		$user->insert();
+
+		$users = $user->limit(2)->findAll();
+		$this->assertEquals('bob', $users[0]->name);
+		$this->assertEquals('bob2', $users[1]->name);
+
+		$users = $user->limit(1, 2)->findAll();
+		$this->assertEquals('bob2', $users[0]->name);
+		$this->assertEquals('bob3', $users[1]->name);
+
+	}
 }

@@ -45,6 +45,7 @@ use PDO;
  *
  * @method self select(string $field, [...$field2]) Select
  * @method self from(string $table) From
+ * @method self join(string $table_to_join, string $join_condition) Join another table in the database
  * @method self set(string $field, mixed $value, [...$field2]) Set
  * @method self where(string $sql_conditions) Where
  * @method self group(string $field, [...$field2]) Group By
@@ -125,6 +126,31 @@ abstract class ActiveRecord extends Base
         'order'         => null,
         'group'         => null
     ];
+
+	/**
+	 * Possible Events that can be run on the Active Record
+	 *
+	 * @var array
+	 */
+	protected array $events = [
+		'beforeInsert',
+		'afterInsert',
+		'beforeUpdate',
+		'afterUpdate',
+		'beforeSave',
+		'afterSave',
+		'beforeDelete',
+		'afterDelete',
+		'beforeFind',
+		'afterFind',
+		'beforeFindAll',
+		'afterFindAll'
+	];
+
+	/**
+	 * @var array Stored the SQL Expressions of the SQL.
+	 */
+	protected array $expressions = [];
 
     /**
      * @var array Stored the Expressions of the SQL.
@@ -207,10 +233,10 @@ abstract class ActiveRecord extends Base
             $this->addCondition($field, $operator, $value, $and_or_or);
         } elseif (in_array($name, array_keys($this->sqlParts))) {
             $this->{$name} = new Expressions([
-                'operator'=>$this->sqlParts[$name],
+                'operator' => $this->sqlParts[$name],
                 'target' => implode(', ', $args)
             ]);
-        }
+		}
         return $this;
     }
 
@@ -277,7 +303,7 @@ abstract class ActiveRecord extends Base
      * function to reset the $params and $sqlExpressions.
      * @return ActiveRecord return $this, can using chain method calls.
      */
-    public function reset()
+    protected function resetQueryData()
     {
         $this->params = [];
         $this->sqlExpressions = [];
@@ -321,9 +347,16 @@ abstract class ActiveRecord extends Base
     public function find($id = null)
     {
         if ($id !== null) {
-            $this->reset()->eq($this->primaryKey, $id);
+            $this->resetQueryData()->eq($this->primaryKey, $id);
         }
-        return $this->query($this->limit(1)->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->reset(), true);
+
+		$this->processEvent('beforeFind', [ $this ]);
+
+		$result = $this->query($this->limit(1)->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData(), true);
+
+		$this->processEvent('afterFind', [ $result ]);
+
+        return $result;
     }
     /**
      * function to find all records in database.
@@ -331,7 +364,11 @@ abstract class ActiveRecord extends Base
      */
     public function findAll(): array
     {
-        return $this->query($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->reset());
+
+		$this->processEvent('beforeFindAll', [ $this ]);
+		$results = $this->query($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData());
+		$this->processEvent('afterFindAll', [ $results ]);
+		return $results;
     }
     /**
      * function to delete current record in database.
@@ -339,33 +376,19 @@ abstract class ActiveRecord extends Base
      */
     public function delete()
     {
-        return $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['delete', 'from', 'where']), $this->params);
-    }
-    /**
-     * function to build update SQL, and update current record in database, just write the dirty data into database.
-     * @return bool|ActiveRecord if update success return current object, other wise return false.
-     */
-    public function update()
-    {
-        if (count($this->dirty) === 0) {
-            return true;
-        }
-        foreach ($this->dirty as $field => $value) {
-            $this->addCondition($field, '=', $value, ',', 'set');
-        }
-
-        $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
-
-        return $this->dirty()->reset();
+		$this->processEvent('beforeDelete', [ $this ]);
+		$result = $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['delete', 'from', 'where']), $this->params);
+		$this->processEvent('afterDelete', [ $this ]);
+        return $result;
     }
     /**
      * function to build insert SQL, and insert current record into database.
-     * @return bool|ActiveRecord if insert success return current object, other wise return false.
+     * @return bool|ActiveRecord if insert success return current object
      */
-    public function insert()
+    public function insert(): ActiveRecord
     {
-        if (count($this->dirty) == 0) {
-            return true;
+        if (count($this->dirty) === 0) {
+            return $this->resetQueryData();
         }
         $value = $this->filterParam($this->dirty);
         $this->insert = new Expressions([
@@ -374,11 +397,50 @@ abstract class ActiveRecord extends Base
         ]);
         $this->values = new Expressions(['operator'=> 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
 
-        $this->execute($this->buildSql(['insert', 'values']), $this->params);
-
+		$this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
+		
+		$this->execute($this->buildSql(['insert', 'values']), $this->params);
         $this->{$this->primaryKey} = $this->pdo->lastInsertId();
-        return $this->dirty()->reset();
+
+		$this->processEvent([ 'afterInsert', 'afterSave' ], [ $this ]);
+
+		return $this->dirty()->resetQueryData();
     }
+	/**
+     * function to build update SQL, and update current record in database, just write the dirty data into database.
+     * @return ActiveRecord if update success return current object
+     */
+    public function update(): ActiveRecord
+    {
+        if (count($this->dirty) === 0) {
+            return $this->resetQueryData();
+        }
+        foreach ($this->dirty as $field => $value) {
+            $this->addCondition($field, '=', $value, ',', 'set');
+        }
+
+		$this->processEvent([ 'beforeUpdate', 'beforeSave' ] , [ $this ]);
+
+        $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
+
+		$this->processEvent([ 'afterUpdate', 'afterSave' ] , [ $this ]);
+
+        return $this->dirty()->resetQueryData();
+    }
+    
+	/**
+	 * Updates or inserts a record
+	 *
+	 * @return ActiveRecord
+	 */
+	public function save(): ActiveRecord
+	{
+		if($this->{$this->primaryKey}) {
+			return $this->update();
+		} else {
+			return $this->insert();
+		}
+	}
     /**
      * helper function to exec sql.
      * @param string $sql The SQL need to be execute.
@@ -392,10 +454,15 @@ abstract class ActiveRecord extends Base
         if ($statement === false) {
             throw new Exception($this->pdo->errorInfo()[2]);
         }
-        $result = $statement->execute($params);
+
+		$this->processEvent('beforeExecute', [ $statement, $params ]);
+
+		$result = $statement->execute($params);
         if ($result === false) {
             throw new Exception($statement->errorInfo()[2]);
         }
+
+		$this->processEvent('afterExecute', [ $statement ]);
         return $result;
     }
     /**
@@ -510,6 +577,7 @@ abstract class ActiveRecord extends Base
         }
         return $this;
     }
+
     /**
      * helper function to build place holder when making SQL expressions.
      * @param mixed $value the value will bind to SQL, just store it in $this->params.
@@ -528,6 +596,7 @@ abstract class ActiveRecord extends Base
         }
         return $value;
     }
+
     /**
      * helper function to add condition into WHERE.
      * create the SQL Expressions.
@@ -562,6 +631,7 @@ abstract class ActiveRecord extends Base
             }
         }
     }
+
     /**
      * helper function to add condition into JOIN.
      * create the SQL Expressions.
@@ -584,6 +654,7 @@ abstract class ActiveRecord extends Base
             ]);
         return $this;
     }
+
     /**
      * helper function to make wrapper. Stored the expression in to array.
      * @param Expressions $exp The expression will be stored.
@@ -597,6 +668,7 @@ abstract class ActiveRecord extends Base
             $this->expressions[] = new Expressions(['operator' => $delimiter, 'target' => $expressions]);
         }
     }
+	
     /**
      * helper function to add condition into WHERE.
      * @param Expressions $exp The expression will be concat into WHERE or SET statement.
@@ -611,4 +683,23 @@ abstract class ActiveRecord extends Base
             $this->{$name}->target = new Expressions(['source' => $this->$name->target, 'operator' => $operator, 'target' => $expressions]);
         }
     }
+
+	/**
+	 * Process an event that's been set.
+	 *
+	 * @param string|array $event   The name (or array of names) of the event from $this->events
+	 * @param array  $data_to_pass Usually ends up being $this
+	 * @return void
+	 */
+	protected function processEvent($event, array $data_to_pass = []) {
+		if(is_array($event)=== false) {
+			$event = [ $event ];
+		}
+
+		foreach($event as $event_name) {
+			if(method_exists($this, $event_name) && in_array($event_name, $this->events, true) === true) {
+				$this->{$event_name}(...$data_to_pass);
+			}
+		}
+	}
 }
