@@ -144,7 +144,8 @@ abstract class ActiveRecord extends Base
         'beforeFind',
         'afterFind',
         'beforeFindAll',
-        'afterFindAll'
+        'afterFindAll',
+		'onConstruct'
     ];
 
     /**
@@ -204,12 +205,15 @@ abstract class ActiveRecord extends Base
     /**
      * The construct
      *
-     * @param PDO   $pdo    PDO object
+     * @param ?PDO  $pdo    PDO object
      * @param array $config Manipulate any property in the object
      */
-    public function __construct(PDO $pdo, array $config = [])
+    public function __construct(?PDO $pdo = null, array $config = [])
     {
         $this->pdo = $pdo;
+
+		$this->processEvent('onConstruct', [ $this, &$config ]);
+
         parent::__construct($config);
     }
     
