@@ -102,17 +102,18 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertIsObject($user_result);
     }
 
-	public function testSave() {
-		$user = new User(new PDO('sqlite:test.db'));
+    public function testSave()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
         $user->password = 'pass';
         $user->save(); // should have inserted
-		$insert_id = $user->id;
-		$user->name = 'new name';
-		$user->save();
-		$this->assertEquals($insert_id, $user->id);
-		$this->assertEquals('new name', $user->name);
-	}
+        $insert_id = $user->id;
+        $user->name = 'new name';
+        $user->save();
+        $this->assertEquals($insert_id, $user->id);
+        $this->assertEquals('new name', $user->name);
+    }
 
     public function testRelations()
     {
@@ -249,60 +250,90 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertFalse($new_user->find($uid));
     }
 
-	public function testFindEvents() {
-		$user = new class(new PDO('sqlite:test.db')) extends User {
-			public function beforeFind(self $self) {
-				// This will force it to pull this kind of query
-				// every time.
-				$self->eq('name', 'Bob');
-			}
+    public function testFindEvents()
+    {
+        $user = new class(new PDO('sqlite:test.db')) extends User {
+            public function beforeFind(self $self)
+            {
+                // This will force it to pull this kind of query
+                // every time.
+                $self->eq('name', 'Bob');
+            }
 
-			public function afterFind(self $self) {
-				$self->password = 'joepassword';
-				$self->setCustomData('real_name', 'Joe');
-			}
-		};
-		$user->name = 'Bob';
-		$user->password = 'bobbytables';
-		$user->insert();
-		$user_record = $user->find();
-		$this->assertEquals('Joe', $user_record->real_name);
-		$this->assertEquals('joepassword', $user_record->password);
-	}
+            public function afterFind(self $self)
+            {
+                $self->password = 'joepassword';
+                $self->setCustomData('real_name', 'Joe');
+            }
+        };
+        $user->name = 'Bob';
+        $user->password = 'bobbytables';
+        $user->insert();
+        $user_record = $user->find();
+        $this->assertEquals('Joe', $user_record->real_name);
+        $this->assertEquals('joepassword', $user_record->password);
+    }
 
-	public function testInsertEvents() {
-		$user = new class(new PDO('sqlite:test.db')) extends User {
-			protected function beforeInsert(self $self) {
-				$self->password = 'defaultpassword';
-			}
+    public function testInsertEvents()
+    {
+        $user = new class(new PDO('sqlite:test.db')) extends User {
+            protected function beforeInsert(self $self)
+            {
+                $self->password = 'defaultpassword';
+            }
 
-			protected function afterInsert(self $self) {
-				$self->name .= ' after insert';
-			}
-		};
-		$user->name = 'Bob';
-		$user->password = 'bobbytables';
-		$user->insert();
-		$this->assertEquals('Bob after insert', $user->name);
-		$this->assertEquals('defaultpassword', $user->password);
-	}
+            protected function afterInsert(self $self)
+            {
+                $self->name .= ' after insert';
+            }
+        };
+        $user->name = 'Bob';
+        $user->password = 'bobbytables';
+        $user->insert();
+        $this->assertEquals('Bob after insert', $user->name);
+        $this->assertEquals('defaultpassword', $user->password);
+    }
 
-	public function testLimit() {
-		$user = new User(new PDO('sqlite:test.db'));
-		$user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
-		$user->insert();
-		$user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
-		$user->insert();
-		$user->dirty([ 'name' => 'bob3', 'password' => 'pass3' ]);
-		$user->insert();
+    public function testLimit()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob3', 'password' => 'pass3' ]);
+        $user->insert();
 
-		$users = $user->limit(2)->findAll();
-		$this->assertEquals('bob', $users[0]->name);
-		$this->assertEquals('bob2', $users[1]->name);
+        $users = $user->limit(2)->findAll();
+        $this->assertEquals('bob', $users[0]->name);
+        $this->assertEquals('bob2', $users[1]->name);
 
-		$users = $user->limit(1, 2)->findAll();
-		$this->assertEquals('bob2', $users[0]->name);
-		$this->assertEquals('bob3', $users[1]->name);
+        $users = $user->limit(1, 2)->findAll();
+        $this->assertEquals('bob2', $users[0]->name);
+        $this->assertEquals('bob3', $users[1]->name);
+    }
 
-	}
+    public function testCountWithSelect()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob3', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $user->select('COUNT(*) as count')->find();
+        $this->assertEquals(3, $user->count);
+    }
+
+    public function testSelectOneColumn()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->select('name')->find();
+        $this->assertEquals('bob', $user->name);
+        $this->assertEmpty($user->password);
+    }
 }

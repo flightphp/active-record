@@ -295,13 +295,38 @@ $user->isNotNull('id')->find();
 ### Relationships
 You can set several kinds of relationships using this library. You can set one->many and one->one relationships between tables. This requires a little extra setup in the class beforehand.
 
+Setting the `$relations` array is not hard, but guessing the correct syntax can be confusing.
+
+```php
+public $relations = [
+	// you can name the key anything you'd like. The name of the ActiveRecord is probably good. Ex: user, contact, client
+	'whatever_active_record' => [
+		// required
+		self::HAS_ONE, // this is the type of relationship
+
+		// required
+		'Some_Class', // this is the "other" ActiveRecord class this will reference
+
+		// required
+		'local_key', // this is the local_key that references the join.
+		// just FYI, this also only joins to the primary key of the "other" model
+
+		// optional
+		[ 'eq' => 1, 'select' => 'COUNT(*) as count', 'limit' 5 ], // custom methods you want executed. [] if you don't want any.
+
+		// optional
+		'back_reference_name' // this is if you want to back reference this relationship back to itself Ex: $user->contact->user;
+	];
+]
+```
+
 ```php
 class User extends ActiveRecord{
 	public $table = 'user';
 	public $primaryKey = 'id';
 	public $relations = [
-		'contacts' => [ self::HAS_MANY, 'Contact', 'user_id' ],
-		'contact' => [ self::HAS_ONE, 'Contact', 'user_id' ],
+		'contacts' => [ self::HAS_MANY, Contact::class, 'user_id' ],
+		'contact' => [ self::HAS_ONE, Contact::class, 'user_id' ],
 	];
 }
 
@@ -309,9 +334,8 @@ class Contact extends ActiveRecord{
 	public $table = 'contact';
 	public $primaryKey = 'id';
 	public $relations = [
-		'user' => [ self::BELONGS_TO, 'User', 'user_id' ],
-		'user_with_backref' => [ self::BELONGS_TO, 'User', 'user_id', [], 'contact' ],
-        // using 5th param to define backref
+		'user' => [ self::BELONGS_TO, User::class, 'user_id' ],
+		'user_with_backref' => [ self::BELONGS_TO, User::class, 'user_id', [], 'contact' ],
 	];
 }
 ```

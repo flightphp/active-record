@@ -127,30 +127,30 @@ abstract class ActiveRecord extends Base
         'group'         => null
     ];
 
-	/**
-	 * Possible Events that can be run on the Active Record
-	 *
-	 * @var array
-	 */
-	protected array $events = [
-		'beforeInsert',
-		'afterInsert',
-		'beforeUpdate',
-		'afterUpdate',
-		'beforeSave',
-		'afterSave',
-		'beforeDelete',
-		'afterDelete',
-		'beforeFind',
-		'afterFind',
-		'beforeFindAll',
-		'afterFindAll'
-	];
+    /**
+     * Possible Events that can be run on the Active Record
+     *
+     * @var array
+     */
+    protected array $events = [
+        'beforeInsert',
+        'afterInsert',
+        'beforeUpdate',
+        'afterUpdate',
+        'beforeSave',
+        'afterSave',
+        'beforeDelete',
+        'afterDelete',
+        'beforeFind',
+        'afterFind',
+        'beforeFindAll',
+        'afterFindAll'
+    ];
 
-	/**
-	 * @var array Stored the SQL Expressions of the SQL.
-	 */
-	protected array $expressions = [];
+    /**
+     * @var array Stored the SQL Expressions of the SQL.
+     */
+    protected array $expressions = [];
 
     /**
      * @var array Stored the Expressions of the SQL.
@@ -236,7 +236,7 @@ abstract class ActiveRecord extends Base
                 'operator' => $this->sqlParts[$name],
                 'target' => implode(', ', $args)
             ]);
-		}
+        }
         return $this;
     }
 
@@ -299,11 +299,17 @@ abstract class ActiveRecord extends Base
         $this->custom_data[$key] = $value;
     }
 
+    public function clearData(): self
+    {
+        $this->data = [];
+        return $this;
+    }
+
     /**
      * function to reset the $params and $sqlExpressions.
      * @return ActiveRecord return $this, can using chain method calls.
      */
-    protected function resetQueryData()
+    protected function resetQueryData(): self
     {
         $this->params = [];
         $this->sqlExpressions = [];
@@ -350,11 +356,11 @@ abstract class ActiveRecord extends Base
             $this->resetQueryData()->eq($this->primaryKey, $id);
         }
 
-		$this->processEvent('beforeFind', [ $this ]);
+        $this->processEvent('beforeFind', [ $this ]);
 
-		$result = $this->query($this->limit(1)->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData(), true);
+        $result = $this->query($this->limit(1)->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData(), true);
 
-		$this->processEvent('afterFind', [ $result ]);
+        $this->processEvent('afterFind', [ $result ]);
 
         return $result;
     }
@@ -365,10 +371,10 @@ abstract class ActiveRecord extends Base
     public function findAll(): array
     {
 
-		$this->processEvent('beforeFindAll', [ $this ]);
-		$results = $this->query($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData());
-		$this->processEvent('afterFindAll', [ $results ]);
-		return $results;
+        $this->processEvent('beforeFindAll', [ $this ]);
+        $results = $this->query($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData());
+        $this->processEvent('afterFindAll', [ $results ]);
+        return $results;
     }
     /**
      * function to delete current record in database.
@@ -376,9 +382,9 @@ abstract class ActiveRecord extends Base
      */
     public function delete()
     {
-		$this->processEvent('beforeDelete', [ $this ]);
-		$result = $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['delete', 'from', 'where']), $this->params);
-		$this->processEvent('afterDelete', [ $this ]);
+        $this->processEvent('beforeDelete', [ $this ]);
+        $result = $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['delete', 'from', 'where']), $this->params);
+        $this->processEvent('afterDelete', [ $this ]);
         return $result;
     }
     /**
@@ -397,16 +403,16 @@ abstract class ActiveRecord extends Base
         ]);
         $this->values = new Expressions(['operator'=> 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
 
-		$this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
-		
-		$this->execute($this->buildSql(['insert', 'values']), $this->params);
+        $this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
+        
+        $this->execute($this->buildSql(['insert', 'values']), $this->params);
         $this->{$this->primaryKey} = $this->pdo->lastInsertId();
 
-		$this->processEvent([ 'afterInsert', 'afterSave' ], [ $this ]);
+        $this->processEvent([ 'afterInsert', 'afterSave' ], [ $this ]);
 
-		return $this->dirty()->resetQueryData();
+        return $this->dirty()->resetQueryData();
     }
-	/**
+    /**
      * function to build update SQL, and update current record in database, just write the dirty data into database.
      * @return ActiveRecord if update success return current object
      */
@@ -419,28 +425,28 @@ abstract class ActiveRecord extends Base
             $this->addCondition($field, '=', $value, ',', 'set');
         }
 
-		$this->processEvent([ 'beforeUpdate', 'beforeSave' ] , [ $this ]);
+        $this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
 
         $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
 
-		$this->processEvent([ 'afterUpdate', 'afterSave' ] , [ $this ]);
+        $this->processEvent([ 'afterUpdate', 'afterSave' ], [ $this ]);
 
         return $this->dirty()->resetQueryData();
     }
     
-	/**
-	 * Updates or inserts a record
-	 *
-	 * @return ActiveRecord
-	 */
-	public function save(): ActiveRecord
-	{
-		if($this->{$this->primaryKey}) {
-			return $this->update();
-		} else {
-			return $this->insert();
-		}
-	}
+    /**
+     * Updates or inserts a record
+     *
+     * @return ActiveRecord
+     */
+    public function save(): ActiveRecord
+    {
+        if ($this->{$this->primaryKey}) {
+            return $this->update();
+        } else {
+            return $this->insert();
+        }
+    }
     /**
      * helper function to exec sql.
      * @param string $sql The SQL need to be execute.
@@ -455,14 +461,14 @@ abstract class ActiveRecord extends Base
             throw new Exception($this->pdo->errorInfo()[2]);
         }
 
-		$this->processEvent('beforeExecute', [ $statement, $params ]);
+        $this->processEvent('beforeExecute', [ $statement, $params ]);
 
-		$result = $statement->execute($params);
+        $result = $statement->execute($params);
         if ($result === false) {
             throw new Exception($statement->errorInfo()[2]);
         }
 
-		$this->processEvent('afterExecute', [ $statement ]);
+        $this->processEvent('afterExecute', [ $statement ]);
         return $result;
     }
     /**
@@ -477,7 +483,12 @@ abstract class ActiveRecord extends Base
     {
         $sth = $this->pdo->prepare($sql);
         $called_class = get_called_class();
-        $sth->setFetchMode(PDO::FETCH_INTO, ($obj ? $obj : new $called_class ));
+        $obj = $obj ?: new $called_class($this->pdo);
+
+        // Since we are finding a new record, this makes sure that nothing is persisted on the object since we're really looking for a new object.
+        $obj->clearData();
+
+        $sth->setFetchMode(PDO::FETCH_INTO, $obj);
         $sth->execute($param);
         if ($single) {
             return $sth->fetch() ? $obj->dirty() : false;
@@ -491,33 +502,44 @@ abstract class ActiveRecord extends Base
     /**
      * helper function to get relation of this object.
      * There was three types of relations: {BELONGS_TO, HAS_ONE, HAS_MANY}
-     * @param string $name The name of the relation, the array key when defind the relation.
+     * @param string $name The name of the relation, the array key when defining the relation.
      * @return mixed
      */
     protected function &getRelation(string $name)
     {
         $relation = $this->relations[$name];
-        if ($relation instanceof self || (is_array($relation) && $relation[0] instanceof self)) {
+        if (is_array($relation) === true) {
+            // self::BELONGS_TO etc
+            $relation_type_or_object_name = $relation[0];
+            $relation_class = $relation[1] ?? '';
+            $relation_local_key = $relation[2] ?? '';
+            $relation_array_callbacks = $relation[3] ?? [];
+            $relation_back_reference = $relation[4] ?? '';
+        }
+        
+        if ($relation instanceof self || $relation_type_or_object_name instanceof self) {
             return $relation;
         }
-        $this->relations[$name] = $obj = new $relation[1]($this->pdo);
-        if (isset($relation[3]) && is_array($relation[3])) {
-            foreach ((array)$relation[3] as $func => $args) {
-                call_user_func_array([$obj, $func], (array)$args);
+
+        $obj = new $relation_class($this->pdo);
+        $this->relations[$name] = $obj;
+        if ($relation_array_callbacks) {
+            foreach ($relation_array_callbacks as $method => $args) {
+                call_user_func_array([ $obj, $method ], (array) $args);
             }
         }
-        $backref = isset($relation[4]) ? $relation[4] : '';
-        if ((!$relation instanceof self) && self::HAS_ONE == $relation[0]) {
-            $obj->eq($relation[2], $this->{$this->primaryKey})->find() && $backref && $obj->__set($backref, $this);
-        } elseif (is_array($relation) && self::HAS_MANY == $relation[0]) {
-            $this->relations[$name] = $obj->eq($relation[2], $this->{$this->primaryKey})->findAll();
-            if ($backref) {
+
+        if ((!$relation instanceof self) && self::HAS_ONE === $relation_type_or_object_name) {
+            $obj->eq($relation_local_key, $this->{$this->primaryKey})->find() && $relation_back_reference && $obj->__set($relation_back_reference, $this);
+        } elseif (self::HAS_MANY === $relation_type_or_object_name) {
+            $this->relations[$name] = $obj->eq($relation_local_key, $this->{$this->primaryKey})->findAll();
+            if ($relation_back_reference) {
                 foreach ($this->relations[$name] as $o) {
-                    $o->__set($backref, $this);
+                    $o->__set($relation_back_reference, $this);
                 }
             }
-        } elseif ((!$relation instanceof self) && self::BELONGS_TO == $relation[0]) {
-            $obj->eq($obj->primaryKey, $this->{$relation[2]})->find() && $backref && $obj->__set($backref, $this);
+        } elseif (!($relation instanceof self) && self::BELONGS_TO === $relation_type_or_object_name) {
+            $obj->eq($obj->primaryKey, $this->{$relation_local_key})->find() && $relation_back_reference && $obj->__set($relation_back_reference, $this);
         }
         return $this->relations[$name];
     }
@@ -668,7 +690,7 @@ abstract class ActiveRecord extends Base
             $this->expressions[] = new Expressions(['operator' => $delimiter, 'target' => $expressions]);
         }
     }
-	
+    
     /**
      * helper function to add condition into WHERE.
      * @param Expressions $exp The expression will be concat into WHERE or SET statement.
@@ -684,22 +706,23 @@ abstract class ActiveRecord extends Base
         }
     }
 
-	/**
-	 * Process an event that's been set.
-	 *
-	 * @param string|array $event   The name (or array of names) of the event from $this->events
-	 * @param array  $data_to_pass Usually ends up being $this
-	 * @return void
-	 */
-	protected function processEvent($event, array $data_to_pass = []) {
-		if(is_array($event)=== false) {
-			$event = [ $event ];
-		}
+    /**
+     * Process an event that's been set.
+     *
+     * @param string|array $event   The name (or array of names) of the event from $this->events
+     * @param array  $data_to_pass Usually ends up being $this
+     * @return void
+     */
+    protected function processEvent($event, array $data_to_pass = [])
+    {
+        if (is_array($event)=== false) {
+            $event = [ $event ];
+        }
 
-		foreach($event as $event_name) {
-			if(method_exists($this, $event_name) && in_array($event_name, $this->events, true) === true) {
-				$this->{$event_name}(...$data_to_pass);
-			}
-		}
-	}
+        foreach ($event as $event_name) {
+            if (method_exists($this, $event_name) && in_array($event_name, $this->events, true) === true) {
+                $this->{$event_name}(...$data_to_pass);
+            }
+        }
+    }
 }
