@@ -210,8 +210,10 @@ abstract class ActiveRecord extends Base
      */
     public function __construct(?PDO $pdo = null, array $config = [])
     {
-        $this->pdo = $pdo;
-
+		if($pdo) {
+			$this->pdo = $pdo;
+		}
+		
 		$this->processEvent('onConstruct', [ $this, &$config ]);
 
         parent::__construct($config);

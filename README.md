@@ -438,7 +438,7 @@ Flight::register('db', 'PDO', [ 'sqlite:test.db' ]);
 class User extends flight\ActiveRecord {
 	protected string $table = 'users';
 
-	protected function onConstruct(self $self, array &$config) {
+	protected function onConstruct(self $self, array &$config) { // don't forget the & reference
 		$this->pdo = Flight::db();
 		// also could do
 		$config['pdo'] = Flight::db();

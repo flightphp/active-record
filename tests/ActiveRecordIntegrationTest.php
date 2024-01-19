@@ -354,4 +354,20 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('bob2', $users[1]->name);
 		$this->assertTrue(empty($users[2]->name));
     }
+
+	public function testOnConstruct()
+    {
+        $user = new class() extends User {
+            protected function onConstruct(self $self, &$config)
+            {
+                $config['pdo'] = new PDO('sqlite:test.db');
+            }
+        };
+
+		$user->name = 'bob';
+		$user->insert();
+
+		// if it gets to this point it means it's working.
+		$this->assertEquals('bob', $user->name);
+    }
 }
