@@ -2,7 +2,7 @@
     "name": "flightphp/active-record",
     "type": "library",
     "description": "Micro Active Record library in PHP, support chain calls, events, and relations.",
-    "keywords": ["active record", "orm", "pdo", "relation", "micro", "database"],
+    "keywords": ["active record", "orm", "pdo", "relation", "micro", "database","lite","simple"],
     "homepage": "https://docs.flightphp.com",
     "license": "MIT",
 	"authors": [
