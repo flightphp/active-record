@@ -34,6 +34,12 @@ class User extends flight\ActiveRecord {
 Now watch the magic happen!
 
 ```php
+// for sqlite
+$pdo_connection = new PDO('sqlite:test.db'); // this is just for example, you'd probably use a real database connection
+
+// for mysql
+$pdo_connection = new PDO('mysql:host=localhost;dbname=test_db&charset=utf8bm4', 'username', 'password');
+
 $user = new User($pdo_connection);
 $user->name = 'Bobby Tables';
 $user->password = password_hash('some cool password');
@@ -78,6 +84,30 @@ Simply install with Composer
 composer require flightphp/active-record 
 ```
 
+## Usage
+
+This can be used as a standalone library or with the Flight PHP Framework. Completely up to you.
+
+### Standalone
+Just makes sure you pass a PDO connection to the constructor.
+
+```php
+$pdo_connection = new PDO('sqlite:test.db'); // this is just for example, you'd probably use a real database connection
+
+$User = new User($pdo_connection);
+```
+
+### Flight PHP Framework
+If you are using the Flight PHP Framework, you can register the ActiveRecord class as a service (but you honestly don't have to).
+
+```php
+Flight::register('user', 'User', [ $pdo_connection ]);
+
+// then you can use it like this in a controller, a function, etc.
+
+Flight::user()->find(1);
+```
+
 ## API Reference
 ### CRUD functions
 
@@ -109,7 +139,7 @@ $user->findAll();
 Inserts the current record into database.
 
 ```php
-$user = new User();
+$user = new User($pdo_connection);
 $user->name = 'demo';
 $user->password = md5('demo');
 $user->insert();
@@ -192,7 +222,7 @@ $user->where('id=1 AND name="demo"')->find();
 
 #### `group(string $group_by_statement)/groupBy(string $group_by_statement)`
 
-Group your results by a particular condiion.
+Group your results by a particular condition.
 
 ```php
 $user->select('COUNT(*) as count')->groupBy('name')->findAll();
@@ -215,7 +245,7 @@ $user->orderby('name DESC')->limit(0, 10)->findAll();
 ```
 
 ### WHERE conditions
-#### `equal(string $field, mixed $value)/eq(string $field, mixed $value)`
+#### `equal(string $field, mixed $value) / eq(string $field, mixed $value)`
 
 Where `field = $value`
 
@@ -223,58 +253,12 @@ Where `field = $value`
 $user->eq('id', 1)->find();
 ```
 
-#### `notEqual(string $field, mixed $value)/ne(string $field, mixed $value)`
+#### `notEqual(string $field, mixed $value) / ne(string $field, mixed $value)`
 
 Where `field <> $value`
 
 ```php
 $user->ne('id', 1)->find();
-```
-
-#### `greaterThan(string $field, mixed $value)/gt(string $field, mixed $value)`
-
-Where `field > $value`
-
-```php
-$user->gt('id', 1)->find();
-```
-
-#### `lessThan(string $field, mixed $value)/lt(string $field, mixed $value)`
-
-Where `field < $value`
-
-```php
-$user->lt('id', 1)->find();
-```
-#### `greaterThanOrEqual(string $field, mixed $value)/ge(string $field, mixed $value)/gte(string $field, mixed $value)`
-
-Where `field >= $value`
-
-```php
-$user->ge('id', 1)->find();
-```
-#### `lessThanOrEqual(string $field, mixed $value)/le(string $field, mixed $value)/lte(string $field, mixed $value)`
-
-Where `field <= $value`
-
-```php
-$user->le('id', 1)->find();
-```
-
-#### `like(string $field, mixed $value)/notLike(string $field, mixed $value)`
-
-Where `field LIKE $value` or `field NOT LIKE $value`
-
-```php
-$user->like('name', 'de')->find();
-```
-
-#### `in(string $field, array $values)/notIn(string $field, array $values)`
-
-Where `field IN($value)` or `field NOT IN($value)`
-
-```php
-$user->in('id', [1, 2])->find();
 ```
 
 #### `isNull(string $field)`
@@ -284,12 +268,66 @@ Where `field IS NULL`
 ```php
 $user->isNull('id')->find();
 ```
-#### `isNotNull(string $field)/notNull(string $field)`
+#### `isNotNull(string $field) / notNull(string $field)`
 
 Where `field IS NOT NULL`
 
 ```php
 $user->isNotNull('id')->find();
+```
+
+#### `greaterThan(string $field, mixed $value) / gt(string $field, mixed $value)`
+
+Where `field > $value`
+
+```php
+$user->gt('id', 1)->find();
+```
+
+#### `lessThan(string $field, mixed $value) / lt(string $field, mixed $value)`
+
+Where `field < $value`
+
+```php
+$user->lt('id', 1)->find();
+```
+#### `greaterThanOrEqual(string $field, mixed $value) / ge(string $field, mixed $value) / gte(string $field, mixed $value)`
+
+Where `field >= $value`
+
+```php
+$user->ge('id', 1)->find();
+```
+#### `lessThanOrEqual(string $field, mixed $value) / le(string $field, mixed $value) / lte(string $field, mixed $value)`
+
+Where `field <= $value`
+
+```php
+$user->le('id', 1)->find();
+```
+
+#### `like(string $field, mixed $value) / notLike(string $field, mixed $value)`
+
+Where `field LIKE $value` or `field NOT LIKE $value`
+
+```php
+$user->like('name', 'de')->find();
+```
+
+#### `in(string $field, array $values) / notIn(string $field, array $values)`
+
+Where `field IN($value)` or `field NOT IN($value)`
+
+```php
+$user->in('id', [1, 2])->find();
+```
+
+#### `between(string $field, array $values)`
+
+Where `field BETWEEN $value AND $value1`
+
+```php
+$user->between('id', [1, 2])->find();
 ```
 
 ### Relationships
@@ -343,7 +381,7 @@ class Contact extends ActiveRecord{
 Now we have the references setup so we can use them very easily!
 
 ```php
-$user = new User();
+$user = new User($pdo_connection);
 
 // find the most recent user.
 $user->notNull('id')->orderBy('id desc')->find();
@@ -383,6 +421,30 @@ echo $user->page_view_count;
 ### Events
 
 One more super awesome feature about this library is about events. Events are triggered at certain times based on certain methods you call. They are very very helpful in setting up data for you automatically.
+
+#### `onConstruct(ActiveRecord $ActiveRecord, array &config)`
+
+This is really helpful if you need to set a default connection or something like that.
+
+```php
+// index.php or bootstrap.php
+Flight::register('db', 'PDO', [ 'sqlite:test.db' ]);
+
+//
+//
+//
+
+// User.php
+class User extends flight\ActiveRecord {
+	protected string $table = 'users';
+
+	protected function onConstruct(self $self, array &$config) { // don't forget the & reference
+		$this->pdo = Flight::db();
+		// also could do
+		$config['pdo'] = Flight::db();
+	} 
+}
+```
 
 #### `beforeFind(ActiveRecord $ActiveRecord)`
 

@@ -1,9 +1,9 @@
 {
     "name": "flightphp/active-record",
     "type": "library",
-    "description": "Micro Active Record library in PHP, support chain calls and relations(HAS_ONE, HAS_MANY, BELONGS_TO).",
+    "description": "Micro Active Record library in PHP, support chain calls, events, and relations.",
     "keywords": ["active record", "orm", "pdo", "relation", "micro", "database"],
-    "homepage": "http://lloydzhou.github.io/activerecord/",
+    "homepage": "https://docs.flightphp.com",
     "license": "MIT",
 	"authors": [
         {
@@ -19,7 +19,7 @@
         }
     ],
     "require": {
-        "php": ">=5.3.0"
+        "php": ">=7.4"
     },
     "require-dev": {
 		"ext-pdo_sqlite": "*",

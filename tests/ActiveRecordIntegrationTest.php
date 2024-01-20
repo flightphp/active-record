@@ -307,10 +307,12 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $users = $user->limit(2)->findAll();
         $this->assertEquals('bob', $users[0]->name);
         $this->assertEquals('bob2', $users[1]->name);
+		$this->assertTrue(empty($users[2]->name));
 
         $users = $user->limit(1, 2)->findAll();
         $this->assertEquals('bob2', $users[0]->name);
         $this->assertEquals('bob3', $users[1]->name);
+		$this->assertTrue(empty($users[2]->name));
     }
 
     public function testCountWithSelect()
@@ -335,5 +337,37 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->select('name')->find();
         $this->assertEquals('bob', $user->name);
         $this->assertEmpty($user->password);
+    }
+
+	public function testBetween()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob3', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $users = $user->between('id', [1, 2])->findAll();
+        $this->assertEquals('bob', $users[0]->name);
+        $this->assertEquals('bob2', $users[1]->name);
+		$this->assertTrue(empty($users[2]->name));
+    }
+
+	public function testOnConstruct()
+    {
+        $user = new class() extends User {
+            protected function onConstruct(self $self, &$config)
+            {
+                $config['pdo'] = new PDO('sqlite:test.db');
+            }
+        };
+
+		$user->name = 'bob';
+		$user->insert();
+
+		// if it gets to this point it means it's working.
+		$this->assertEquals('bob', $user->name);
     }
 }

@@ -5,3 +5,4 @@ test.db
 .vscode/
 coverage/
 clover.xml
+.phpunit.result.cache
