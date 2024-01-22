@@ -22,7 +22,8 @@ Now you can setup a new class to represent this table:
  * An ActiveRecord class is usually singular
  * 
  * It's highly recommended to add the properties of the table as comments here
- * 
+ *
+ * @property int    $id
  * @property string $name
  * @property string $password
  */ 
