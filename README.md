@@ -28,7 +28,10 @@ Now you can setup a new class to represent this table:
  * @property string $password
  */ 
 class User extends flight\ActiveRecord {
-	protected $table = 'users';
+	public function __construct($database_connection)
+	{
+		parent::__construct($database_connection, [ 'table' => 'users' ]);
+	}
 }
 ```
 
