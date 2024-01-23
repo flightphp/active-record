@@ -48,14 +48,7 @@ class MysqliAdapter implements DatabaseInterface {
 	 * @return string
 	 */
 	protected function convertNamedPlaceholdersToQuestionMarks(string $sql): string {
-		$named_placeholder_regex = '/:(\w+)/';
-		$matches = [];
-		preg_match_all($named_placeholder_regex, $sql, $matches);
-		$named_placeholders = $matches[1];
-		$question_mark_placeholders = array_map(function($named_placeholder) {
-			return '?';
-		}, $named_placeholders);
-		return str_replace($named_placeholders, $question_mark_placeholders, $sql);
+		return preg_replace('/:(\w+)/', '?', $sql);
 	}
 
 	/**
@@ -65,6 +58,6 @@ class MysqliAdapter implements DatabaseInterface {
 	 * @codeCoverageIgnore Can't mock this if your life depends on it.
 	 */
 	protected function getErrorList(): array {
-		return $this->statement->error_list;
+		return $this->mysqli->error_list;
 	}
 }

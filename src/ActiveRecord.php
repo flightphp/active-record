@@ -208,10 +208,11 @@ abstract class ActiveRecord extends Base
     /**
      * The construct
      *
-     * @param mixed $databaseConnection   Database object (PDO, mysqli, etc)
-     * @param array $config 			  Manipulate any property in the object
+     * @param mixed   $databaseConnection  Database object (PDO, mysqli, etc)
+	 * @param ?string $table			   The table name in database
+     * @param array   $config 			   Manipulate any property in the object
      */
-    public function __construct($databaseConnection = null, array $config = [])
+    public function __construct($databaseConnection = null, ?string $table = '', array $config = [])
     {
 		$this->processEvent('onConstruct', [ $this, &$config ]);
 		$rawConnection = null;
@@ -227,6 +228,10 @@ abstract class ActiveRecord extends Base
 			$this->transformAndPersistConnection($rawConnection);
 		} else if($databaseConnection instanceof DatabaseInterface) {
 			$this->databaseConnection = $databaseConnection;
+		}
+
+		if($table) {
+			$this->table = $table;
 		}
         parent::__construct($config);
     }
