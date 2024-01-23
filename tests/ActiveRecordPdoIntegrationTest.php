@@ -2,13 +2,12 @@
 
 namespace flight\tests;
 
-use Exception;
 use flight\ActiveRecord;
 use flight\tests\classes\Contact;
 use flight\tests\classes\User;
 use PDO;
 
-class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
+class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 {
     protected $ActiveRecord;
 
@@ -45,18 +44,6 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
     {
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS contact;");
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS user;");
-    }
-
-    public function testError()
-    {
-        try {
-            $this->ActiveRecord->getPdo()->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $this->ActiveRecord->execute('CREATE TABLE IF NOT EXISTS');
-        } catch (Exception $e) {
-            $this->assertInstanceOf('PDOException', $e);
-            $this->assertEquals('HY000', $e->getCode());
-            $this->assertEquals('SQLSTATE[HY000]: General error: 1 incomplete input', $e->getMessage());
-        }
     }
 
     public function testInsert()
@@ -360,7 +347,7 @@ class ActiveRecordIntegrationTest extends \PHPUnit\Framework\TestCase
         $user = new class() extends User {
             protected function onConstruct(self $self, &$config)
             {
-                $config['pdo'] = new PDO('sqlite:test.db');
+                $config['connection'] = new PDO('sqlite:test.db');
             }
         };
 

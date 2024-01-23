@@ -6,6 +6,7 @@ use Exception;
 use flight\ActiveRecord;
 use PDO;
 use PDOStatement;
+use stdClass;
 
 class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 {
@@ -40,7 +41,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $record->execute('SELECT * FROM user');
     }
 
-    public function testExecuteStatementError()
+	public function testExecuteStatementError()
     {
         $statement_mock = $this->createStub(PDOStatement::class);
         $pdo_mock = $this->createStub(PDO::class);
@@ -72,4 +73,21 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $record->setCustomData('test', 'something');
         $this->assertEquals('something', $record->test);
     }
+
+	public function testCustomDataUnset()
+	{
+		$pdo_mock = $this->createStub(PDO::class);
+		$record = new class($pdo_mock) extends ActiveRecord {
+		};
+		$record->setCustomData('test', 'something');
+		unset($record->test);
+		$this->assertEquals(null, $record->test);
+	}
+
+	public function testConstructBadDatabaseInput() {
+		$this->expectException(Exception::class);
+		$this->expectExceptionMessage('Database connection type not supported');
+		$record = new class(new stdClass) extends ActiveRecord {
+		};
+	}
 }

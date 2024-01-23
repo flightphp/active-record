@@ -4,6 +4,9 @@ declare(strict_types=1);
 namespace flight;
 
 use Exception;
+use flight\database\DatabaseInterface;
+use flight\database\DatabaseStatementInterface;
+use mysqli;
 use PDO;
 
 /**
@@ -88,7 +91,7 @@ abstract class ActiveRecord extends Base
         'notNull' => 'IS NOT NULL',
     ];
     /**
-     * @var array Part of SQL, maping the function name and the operator to build SQL Part.
+     * @var array Part of SQL, mapping the function name and the operator to build SQL Part.
      * <pre>call function like this:
      *      $user->order('id desc', 'name asc')->limit(2,1);
      *  can explain to SQL:
@@ -159,11 +162,11 @@ abstract class ActiveRecord extends Base
     protected array $sqlExpressions = [];
 
     /**
-     * PDO connection
+     * Database connection
      *
-     * @var PDO
+     * @var DatabaseInterface
      */
-    protected PDO $pdo;
+    protected DatabaseInterface $databaseConnection;
 
     /**
      * @var string  The table name in database.
@@ -195,7 +198,7 @@ abstract class ActiveRecord extends Base
      *
      * @var array
      */
-    protected array $custom_data = [];
+    protected array $customData = [];
 
     /**
      * @var int The count of bind params, using this count and const "PREFIX" (:ph) to generate place holder in SQL.
@@ -205,17 +208,26 @@ abstract class ActiveRecord extends Base
     /**
      * The construct
      *
-     * @param ?PDO  $pdo    PDO object
-     * @param array $config Manipulate any property in the object
+     * @param mixed $databaseConnection   Database object (PDO, mysqli, etc)
+     * @param array $config 			  Manipulate any property in the object
      */
-    public function __construct(?PDO $pdo = null, array $config = [])
+    public function __construct($databaseConnection = null, array $config = [])
     {
-		if($pdo) {
-			$this->pdo = $pdo;
+		$this->processEvent('onConstruct', [ $this, &$config ]);
+		$rawConnection = null;
+		if($databaseConnection !== null && ($databaseConnection instanceof DatabaseInterface) === false) {
+			$rawConnection = $databaseConnection;
+		} else if(isset($config['connection']) === true) {
+			$rawConnection = $config['connection'];
+			// we don't want this actually directly set in the model....it'd be useless
+			unset($config['connection']);
 		}
 		
-		$this->processEvent('onConstruct', [ $this, &$config ]);
-
+		if($rawConnection !== null) {
+			$this->transformAndPersistConnection($rawConnection);
+		} else if($databaseConnection instanceof DatabaseInterface) {
+			$this->databaseConnection = $databaseConnection;
+		}
         parent::__construct($config);
     }
     
@@ -275,6 +287,9 @@ abstract class ActiveRecord extends Base
         if (isset($this->dirty[$var])) {
             unset($this->dirty[$var]);
         }
+		if (isset($this->customData[$var])) {
+            unset($this->customData[$var]);
+        }
     }
 
     /**
@@ -286,12 +301,29 @@ abstract class ActiveRecord extends Base
             return $this->sqlExpressions[$var];
         } elseif (isset($this->relations[$var]) === true) {
             return $this->getRelation($var);
-        } elseif (isset($this->custom_data[$var]) === true) {
-            return $this->custom_data[$var];
+        } elseif (isset($this->customData[$var]) === true) {
+            return $this->customData[$var];
         } else {
             return parent::__get($var);
         }
     }
+
+	/**
+	 * Transforms the raw connection into a database connection usable by this class
+	 *
+	 * @param mixed $rawConnection Raw connection
+	 * @return void
+	 * @throws Exception
+	 */
+	protected function transformAndPersistConnection($rawConnection) {
+		if($rawConnection instanceof PDO) {
+			$this->databaseConnection = new \flight\database\pdo\PdoAdapter($rawConnection);
+		} else if($rawConnection instanceof mysqli) {
+			$this->databaseConnection = new \flight\database\mysqli\MysqliAdapter($rawConnection);
+		} else {
+			throw new Exception('Database connection type not supported');
+		}
+	}
 
     /**
      * This is for setting a custom property on this model, that is not part of the database
@@ -302,7 +334,7 @@ abstract class ActiveRecord extends Base
      */
     public function setCustomData(string $key, $value): void
     {
-        $this->custom_data[$key] = $value;
+        $this->customData[$key] = $value;
     }
 
     public function clearData(): self
@@ -334,22 +366,13 @@ abstract class ActiveRecord extends Base
     }
 
     /**
-     * get the pdo connection.
-     * @return PDO
+     * get the database connection.
+     * @return DatabaseInterface
      */
-    public function getPdo()
+    public function getDatabaseConnection()
     {
-        return $this->pdo;
+        return $this->databaseConnection;
     }
-
-    /**
-     * set the PDO connection.
-     * @param PDO $pdo
-     */
-    // public function setPdo(PDO $pdo)
-    // {
-    //     $this->pdo = $pdo;
-    // }
 
     /**
      * function to find one record and assign in to current object.
@@ -376,14 +399,13 @@ abstract class ActiveRecord extends Base
      */
     public function findAll(): array
     {
-
         $this->processEvent('beforeFindAll', [ $this ]);
         $results = $this->query($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData());
         $this->processEvent('afterFindAll', [ $results ]);
         return $results;
     }
     /**
-     * function to delete current record in database.
+     * Function to delete current record in database.
      * @return bool
      */
     public function delete()
@@ -391,7 +413,7 @@ abstract class ActiveRecord extends Base
         $this->processEvent('beforeDelete', [ $this ]);
         $result = $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['delete', 'from', 'where']), $this->params);
         $this->processEvent('afterDelete', [ $this ]);
-        return $result;
+        return $result instanceof DatabaseStatementInterface;
     }
     /**
      * function to build insert SQL, and insert current record into database.
@@ -412,7 +434,7 @@ abstract class ActiveRecord extends Base
         $this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
         
         $this->execute($this->buildSql(['insert', 'values']), $this->params);
-        $this->{$this->primaryKey} = $this->pdo->lastInsertId();
+        $this->{$this->primaryKey} = $this->databaseConnection->lastInsertId();
 
         $this->processEvent([ 'afterInsert', 'afterSave' ], [ $this ]);
 
@@ -457,26 +479,17 @@ abstract class ActiveRecord extends Base
      * helper function to exec sql.
      * @param string $sql The SQL need to be execute.
      * @param array $params The param will be bind to PDOStatement.
-     * @return bool
+     * @return DatabaseStatementInterface
      */
-    public function execute(string $sql, array $params = []): bool
+    public function execute(string $sql, array $params = []): DatabaseStatementInterface
     {
-        $statement = $this->pdo->prepare($sql);
+        $statement = $this->databaseConnection->prepare($sql);
 
-        if ($statement === false) {
-            throw new Exception($this->pdo->errorInfo()[2]);
-        }
+        $statement->execute($params);
 
-        $this->processEvent('beforeExecute', [ $statement, $params ]);
-
-        $result = $statement->execute($params);
-        if ($result === false) {
-            throw new Exception($statement->errorInfo()[2]);
-        }
-
-        $this->processEvent('afterExecute', [ $statement ]);
-        return $result;
+        return $statement;
     }
+
     /**
      * helper function to query one record by sql and params.
      * @param string $sql The SQL to find record.
@@ -487,20 +500,17 @@ abstract class ActiveRecord extends Base
      */
     public function query(string $sql, array $param = [], ActiveRecord $obj = null, bool $single = false)
     {
-        $sth = $this->pdo->prepare($sql);
         $called_class = get_called_class();
-        $obj = $obj ?: new $called_class($this->pdo);
+        $obj = $obj ?: new $called_class($this->databaseConnection);
 
         // Since we are finding a new record, this makes sure that nothing is persisted on the object since we're really looking for a new object.
         $obj->clearData();
-
-        $sth->setFetchMode(PDO::FETCH_INTO, $obj);
-        $sth->execute($param);
+		$sth = $this->execute($sql, $param);
         if ($single) {
-            return $sth->fetch() ? $obj->dirty() : false;
+            return $sth->fetch($obj) ? $obj->dirty() : false;
         }
         $result = [];
-        while ($obj = $sth->fetch()) {
+        while ($obj = $sth->fetch($obj)) {
             $result[] = clone $obj->dirty();
         }
         return $result;
@@ -527,7 +537,7 @@ abstract class ActiveRecord extends Base
             return $relation;
         }
 
-        $obj = new $relation_class($this->pdo);
+        $obj = new $relation_class($this->databaseConnection);
         $this->relations[$name] = $obj;
         if ($relation_array_callbacks) {
             foreach ($relation_array_callbacks as $method => $args) {
