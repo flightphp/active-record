@@ -357,4 +357,24 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 		// if it gets to this point it means it's working.
 		$this->assertEquals('bob', $user->name);
     }
+
+	public function testJsonSerializeableWithCustomData() {
+		$user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+		$user->setCustomData('test', 'test');
+
+		$this->assertEquals('{"name":"bob","password":"pass","id":"1","test":"test"}', json_encode($user));
+
+		// and test print_r and __debugInfo while we're at it
+		$this->assertEquals('flight\tests\classes\User Object
+(
+    [name] => bob
+    [password] => pass
+    [id] => 1
+    [test] => test
+)
+', print_r($user, true)
+		);
+	}
 }

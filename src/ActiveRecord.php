@@ -6,6 +6,7 @@ namespace flight;
 use Exception;
 use flight\database\DatabaseInterface;
 use flight\database\DatabaseStatementInterface;
+use JsonSerializable;
 use mysqli;
 use PDO;
 
@@ -60,7 +61,7 @@ use PDO;
  * @method self offset(int $offset) Offset
  * @method self top(int $top) Top
  */
-abstract class ActiveRecord extends Base
+abstract class ActiveRecord extends Base implements JsonSerializable
 {
     public const BELONGS_TO = 'belongs_to';
     public const HAS_MANY = 'has_many';
@@ -184,7 +185,7 @@ abstract class ActiveRecord extends Base
     protected array $dirty = [];
 
     /**
-     * @var array Stored the params will bind to SQL when call PDOStatement::execute(),
+     * @var array Stored the params will bind to SQL when call DatabaseStatement::execute(),
      */
     protected array $params = [];
     
@@ -746,4 +747,20 @@ abstract class ActiveRecord extends Base
             }
         }
     }
+
+	/**
+	 * @inheritDoc
+	 */
+	public function jsonSerialize() {
+		return $this->data + $this->customData;
+	}
+
+	/**
+	 * Only need it to print out a few things, not every single things ever.
+	 *
+	 * @return array
+	 */
+	public function __debugInfo() {
+		return $this->data + $this->customData;
+	}
 }

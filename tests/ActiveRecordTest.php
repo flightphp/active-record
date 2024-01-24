@@ -90,4 +90,14 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 		$record = new class(new stdClass) extends ActiveRecord {
 		};
 	}
+
+	public function testSetTableOnConstruct() {
+		$record = new class(null, 'test_table') extends ActiveRecord {
+			public function getTable() {
+				return $this->table;
+			}
+		};
+		$this->assertEquals('test_table', $record->getTable());
+	}
+
 }
