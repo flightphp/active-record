@@ -294,12 +294,12 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $users = $user->limit(2)->findAll();
         $this->assertEquals('bob', $users[0]->name);
         $this->assertEquals('bob2', $users[1]->name);
-		$this->assertTrue(empty($users[2]->name));
+        $this->assertTrue(empty($users[2]->name));
 
         $users = $user->limit(1, 2)->findAll();
         $this->assertEquals('bob2', $users[0]->name);
         $this->assertEquals('bob3', $users[1]->name);
-		$this->assertTrue(empty($users[2]->name));
+        $this->assertTrue(empty($users[2]->name));
     }
 
     public function testCountWithSelect()
@@ -326,7 +326,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEmpty($user->password);
     }
 
-	public function testBetween()
+    public function testBetween()
     {
         $user = new User(new PDO('sqlite:test.db'));
         $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
@@ -339,10 +339,10 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $users = $user->between('id', [1, 2])->findAll();
         $this->assertEquals('bob', $users[0]->name);
         $this->assertEquals('bob2', $users[1]->name);
-		$this->assertTrue(empty($users[2]->name));
+        $this->assertTrue(empty($users[2]->name));
     }
 
-	public function testOnConstruct()
+    public function testOnConstruct()
     {
         $user = new class() extends User {
             protected function onConstruct(self $self, &$config)
@@ -351,30 +351,30 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
             }
         };
 
-		$user->name = 'bob';
-		$user->insert();
+        $user->name = 'bob';
+        $user->insert();
 
-		// if it gets to this point it means it's working.
-		$this->assertEquals('bob', $user->name);
+        // if it gets to this point it means it's working.
+        $this->assertEquals('bob', $user->name);
     }
 
-	public function testJsonSerializeableWithCustomData() {
-		$user = new User(new PDO('sqlite:test.db'));
+    public function testJsonSerializeableWithCustomData()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
         $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
         $user->insert();
-		$user->setCustomData('test', 'test');
+        $user->setCustomData('test', 'test');
 
-		$this->assertEquals('{"name":"bob","password":"pass","id":"1","test":"test"}', json_encode($user));
+        $this->assertEquals('{"name":"bob","password":"pass","id":"1","test":"test"}', json_encode($user));
 
-		// and test print_r and __debugInfo while we're at it
-		$this->assertEquals('flight\tests\classes\User Object
+        // and test print_r and __debugInfo while we're at it
+        $this->assertEquals('flight\tests\classes\User Object
 (
     [name] => bob
     [password] => pass
     [id] => 1
     [test] => test
 )
-', print_r($user, true)
-		);
-	}
+', print_r($user, true));
+    }
 }
