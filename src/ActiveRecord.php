@@ -6,6 +6,7 @@ namespace flight;
 use Exception;
 use flight\database\DatabaseInterface;
 use flight\database\DatabaseStatementInterface;
+use JsonSerializable;
 use mysqli;
 use PDO;
 
@@ -60,7 +61,7 @@ use PDO;
  * @method self offset(int $offset) Offset
  * @method self top(int $top) Top
  */
-abstract class ActiveRecord extends Base
+abstract class ActiveRecord extends Base implements JsonSerializable
 {
     public const BELONGS_TO = 'belongs_to';
     public const HAS_MANY = 'has_many';
@@ -148,7 +149,7 @@ abstract class ActiveRecord extends Base
         'afterFind',
         'beforeFindAll',
         'afterFindAll',
-		'onConstruct'
+        'onConstruct'
     ];
 
     /**
@@ -184,7 +185,7 @@ abstract class ActiveRecord extends Base
     protected array $dirty = [];
 
     /**
-     * @var array Stored the params will bind to SQL when call PDOStatement::execute(),
+     * @var array Stored the params will bind to SQL when call DatabaseStatement::execute(),
      */
     protected array $params = [];
     
@@ -209,30 +210,30 @@ abstract class ActiveRecord extends Base
      * The construct
      *
      * @param mixed   $databaseConnection  Database object (PDO, mysqli, etc)
-	 * @param ?string $table			   The table name in database
-     * @param array   $config 			   Manipulate any property in the object
+     * @param ?string $table               The table name in database
+     * @param array   $config              Manipulate any property in the object
      */
     public function __construct($databaseConnection = null, ?string $table = '', array $config = [])
     {
-		$this->processEvent('onConstruct', [ $this, &$config ]);
-		$rawConnection = null;
-		if($databaseConnection !== null && ($databaseConnection instanceof DatabaseInterface) === false) {
-			$rawConnection = $databaseConnection;
-		} else if(isset($config['connection']) === true) {
-			$rawConnection = $config['connection'];
-			// we don't want this actually directly set in the model....it'd be useless
-			unset($config['connection']);
-		}
-		
-		if($rawConnection !== null) {
-			$this->transformAndPersistConnection($rawConnection);
-		} else if($databaseConnection instanceof DatabaseInterface) {
-			$this->databaseConnection = $databaseConnection;
-		}
+        $this->processEvent('onConstruct', [ $this, &$config ]);
+        $rawConnection = null;
+        if ($databaseConnection !== null && ($databaseConnection instanceof DatabaseInterface) === false) {
+            $rawConnection = $databaseConnection;
+        } elseif (isset($config['connection']) === true) {
+            $rawConnection = $config['connection'];
+            // we don't want this actually directly set in the model....it'd be useless
+            unset($config['connection']);
+        }
+        
+        if ($rawConnection !== null) {
+            $this->transformAndPersistConnection($rawConnection);
+        } elseif ($databaseConnection instanceof DatabaseInterface) {
+            $this->databaseConnection = $databaseConnection;
+        }
 
-		if($table) {
-			$this->table = $table;
-		}
+        if ($table) {
+            $this->table = $table;
+        }
         parent::__construct($config);
     }
     
@@ -292,7 +293,7 @@ abstract class ActiveRecord extends Base
         if (isset($this->dirty[$var])) {
             unset($this->dirty[$var]);
         }
-		if (isset($this->customData[$var])) {
+        if (isset($this->customData[$var])) {
             unset($this->customData[$var]);
         }
     }
@@ -313,22 +314,23 @@ abstract class ActiveRecord extends Base
         }
     }
 
-	/**
-	 * Transforms the raw connection into a database connection usable by this class
-	 *
-	 * @param mixed $rawConnection Raw connection
-	 * @return void
-	 * @throws Exception
-	 */
-	protected function transformAndPersistConnection($rawConnection) {
-		if($rawConnection instanceof PDO) {
-			$this->databaseConnection = new \flight\database\pdo\PdoAdapter($rawConnection);
-		} else if($rawConnection instanceof mysqli) {
-			$this->databaseConnection = new \flight\database\mysqli\MysqliAdapter($rawConnection);
-		} else {
-			throw new Exception('Database connection type not supported');
-		}
-	}
+    /**
+     * Transforms the raw connection into a database connection usable by this class
+     *
+     * @param mixed $rawConnection Raw connection
+     * @return void
+     * @throws Exception
+     */
+    protected function transformAndPersistConnection($rawConnection)
+    {
+        if ($rawConnection instanceof PDO) {
+            $this->databaseConnection = new \flight\database\pdo\PdoAdapter($rawConnection);
+        } elseif ($rawConnection instanceof mysqli) {
+            $this->databaseConnection = new \flight\database\mysqli\MysqliAdapter($rawConnection);
+        } else {
+            throw new Exception('Database connection type not supported');
+        }
+    }
 
     /**
      * This is for setting a custom property on this model, that is not part of the database
@@ -510,7 +512,7 @@ abstract class ActiveRecord extends Base
 
         // Since we are finding a new record, this makes sure that nothing is persisted on the object since we're really looking for a new object.
         $obj->clearData();
-		$sth = $this->execute($sql, $param);
+        $sth = $this->execute($sql, $param);
         if ($single) {
             return $sth->fetch($obj) ? $obj->dirty() : false;
         }
@@ -745,5 +747,23 @@ abstract class ActiveRecord extends Base
                 $this->{$event_name}(...$data_to_pass);
             }
         }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function jsonSerialize()
+    {
+        return $this->data + $this->customData;
+    }
+
+    /**
+     * Only need it to print out a few things, not every single things ever.
+     *
+     * @return array
+     */
+    public function __debugInfo()
+    {
+        return $this->data + $this->customData;
     }
 }

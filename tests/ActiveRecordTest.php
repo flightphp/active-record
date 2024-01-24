@@ -41,7 +41,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $record->execute('SELECT * FROM user');
     }
 
-	public function testExecuteStatementError()
+    public function testExecuteStatementError()
     {
         $statement_mock = $this->createStub(PDOStatement::class);
         $pdo_mock = $this->createStub(PDO::class);
@@ -74,20 +74,32 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('something', $record->test);
     }
 
-	public function testCustomDataUnset()
-	{
-		$pdo_mock = $this->createStub(PDO::class);
-		$record = new class($pdo_mock) extends ActiveRecord {
-		};
-		$record->setCustomData('test', 'something');
-		unset($record->test);
-		$this->assertEquals(null, $record->test);
-	}
+    public function testCustomDataUnset()
+    {
+        $pdo_mock = $this->createStub(PDO::class);
+        $record = new class($pdo_mock) extends ActiveRecord {
+        };
+        $record->setCustomData('test', 'something');
+        unset($record->test);
+        $this->assertEquals(null, $record->test);
+    }
 
-	public function testConstructBadDatabaseInput() {
-		$this->expectException(Exception::class);
-		$this->expectExceptionMessage('Database connection type not supported');
-		$record = new class(new stdClass) extends ActiveRecord {
-		};
-	}
+    public function testConstructBadDatabaseInput()
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Database connection type not supported');
+        $record = new class(new stdClass) extends ActiveRecord {
+        };
+    }
+
+    public function testSetTableOnConstruct()
+    {
+        $record = new class(null, 'test_table') extends ActiveRecord {
+            public function getTable()
+            {
+                return $this->table;
+            }
+        };
+        $this->assertEquals('test_table', $record->getTable());
+    }
 }
