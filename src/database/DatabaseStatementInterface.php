@@ -1,11 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace flight\database;
 
 interface DatabaseStatementInterface
 {
-
     /**
      * Executes a prepared statement
      *

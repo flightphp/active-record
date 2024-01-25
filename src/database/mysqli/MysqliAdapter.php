@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace flight\database\mysqli;
@@ -10,7 +11,6 @@ use mysqli;
 
 class MysqliAdapter implements DatabaseInterface
 {
-
     private mysqli $mysqli;
 
     /**

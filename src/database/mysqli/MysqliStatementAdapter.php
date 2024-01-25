@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace flight\database\mysqli;
@@ -9,7 +10,6 @@ use mysqli_stmt;
 
 class MysqliStatementAdapter implements DatabaseStatementInterface
 {
-
     private mysqli_stmt $statement;
 
     /**
@@ -45,7 +45,7 @@ class MysqliStatementAdapter implements DatabaseStatementInterface
      */
     public function fetch(&$object)
     {
-        
+
         $raw_result = $this->statement->get_result();
         $result = $raw_result->fetch_assoc();
         if ($result) {

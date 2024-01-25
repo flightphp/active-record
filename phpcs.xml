@@ -3,7 +3,7 @@
     <description>Created with the PHP Coding Standard Generator. http://edorian.github.io/php-coding-standard-generator/</description>
     <arg name="colors"/>
     <arg name="tab-width" value="4"/>
-	<rule ref="PSR2"/>
+	<rule ref="PSR12"/>
 	<!-- <rule ref="Generic.WhiteSpace.DisallowSpaceIndent"/> -->
 	<file>src/</file>
 	<file>tests/</file>

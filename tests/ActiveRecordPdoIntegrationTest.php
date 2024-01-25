@@ -25,7 +25,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
     public function setUp(): void
     {
-        $this->ActiveRecord = new class(new PDO('sqlite:test.db')) extends ActiveRecord {
+        $this->ActiveRecord = new class (new PDO('sqlite:test.db')) extends ActiveRecord {
         };
         $this->ActiveRecord->execute("CREATE TABLE IF NOT EXISTS user (
             id INTEGER PRIMARY KEY, 
@@ -114,7 +114,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $contact->email = 'test@amail.com';
         $contact->address = 'test address';
         $contact->insert();
-        
+
         $this->assertEquals($contact->user->id, $contact->user_id);
         $this->assertEquals($contact->user->contact->id, $contact->id);
         $this->assertEquals($contact->user->contacts[0]->id, $contact->id);
@@ -142,7 +142,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
         return $contact;
     }
-    
+
     public function testJoin()
     {
         $user = new User(new PDO('sqlite:test.db'));
@@ -162,10 +162,10 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($user->email, $contact->email);
         $this->assertEquals($user->address, $contact->address);
     }
-    
+
     public function testQuery()
     {
-        $user = new class(new PDO('sqlite:test.db')) extends User {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
             public function getDirty()
             {
                 return $this->dirty;
@@ -185,7 +185,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertGreaterThan(0, $user->id);
         $this->assertSame([], $user->getDirty());
         $user->name = 'testname';
-        $this->assertSame(['name'=>'testname'], $user->getDirty());
+        $this->assertSame(['name' => 'testname'], $user->getDirty());
         $name = $user->name;
         $this->assertEquals('testname', $name);
         unset($user->name);
@@ -210,7 +210,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertGreaterThan(0, $users[0]->id);
         $this->assertGreaterThan(0, $users[1]->id);
     }
-    
+
     public function testDelete()
     {
         $user = new User(new PDO('sqlite:test.db'));
@@ -239,7 +239,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
     public function testFindEvents()
     {
-        $user = new class(new PDO('sqlite:test.db')) extends User {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
             public function beforeFind(self $self)
             {
                 // This will force it to pull this kind of query
@@ -263,7 +263,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
     public function testInsertEvents()
     {
-        $user = new class(new PDO('sqlite:test.db')) extends User {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
             protected function beforeInsert(self $self)
             {
                 $self->password = 'defaultpassword';
@@ -344,7 +344,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
     public function testOnConstruct()
     {
-        $user = new class() extends User {
+        $user = new class () extends User {
             protected function onConstruct(self $self, &$config)
             {
                 $config['connection'] = new PDO('sqlite:test.db');

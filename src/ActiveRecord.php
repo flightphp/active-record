@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace flight;
@@ -188,7 +189,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      * @var array Stored the params will bind to SQL when call DatabaseStatement::execute(),
      */
     protected array $params = [];
-    
+
     /**
      * @var array Stored the configure of the relation, or target of the relation.
      */
@@ -224,7 +225,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             // we don't want this actually directly set in the model....it'd be useless
             unset($config['connection']);
         }
-        
+
         if ($rawConnection !== null) {
             $this->transformAndPersistConnection($rawConnection);
         } elseif ($databaseConnection instanceof DatabaseInterface) {
@@ -236,7 +237,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
         parent::__construct($config);
     }
-    
+
     /**
      * magic function to make calls witch in function mapping stored in $operators and $sqlPart.
      * also can call function of PDO object.
@@ -433,13 +434,13 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
         $value = $this->filterParam($this->dirty);
         $this->insert = new Expressions([
-            'operator'=> 'INSERT INTO '. $this->table,
+            'operator' => 'INSERT INTO ' . $this->table,
             'target' => new WrapExpressions(['target' => array_keys($this->dirty)])
         ]);
-        $this->values = new Expressions(['operator'=> 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
+        $this->values = new Expressions(['operator' => 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
 
         $this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
-        
+
         $this->execute($this->buildSql(['insert', 'values']), $this->params);
         $this->{$this->primaryKey} = $this->databaseConnection->lastInsertId();
 
@@ -468,7 +469,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
         return $this->dirty()->resetQueryData();
     }
-    
+
     /**
      * Updates or inserts a record
      *
@@ -539,7 +540,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $relation_array_callbacks = $relation[3] ?? [];
             $relation_back_reference = $relation[4] ?? '';
         }
-        
+
         if ($relation instanceof self || $relation_type_or_object_name instanceof self) {
             return $relation;
         }
@@ -575,13 +576,13 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected function buildSqlCallback(string $sql_statement, ActiveRecord $object): string
     {
         if ('select' === $sql_statement && null == $object->$sql_statement) {
-            $sql_statement = strtoupper($sql_statement). ' '.$object->table.'.*';
+            $sql_statement = strtoupper($sql_statement) . ' ' . $object->table . '.*';
         } elseif (('update' === $sql_statement || 'from' === $sql_statement) && null == $object->$sql_statement) {
-            $sql_statement = strtoupper($sql_statement).' '. $object->table;
+            $sql_statement = strtoupper($sql_statement) . ' ' . $object->table;
         } elseif ('delete' === $sql_statement) {
-            $sql_statement = strtoupper($sql_statement). ' ';
+            $sql_statement = strtoupper($sql_statement) . ' ';
         } else {
-            $sql_statement = (null !== $object->$sql_statement) ? $object->$sql_statement. ' ' : '';
+            $sql_statement = (null !== $object->$sql_statement) ? $object->$sql_statement . ' ' : '';
         }
 
         return $sql_statement;
@@ -632,10 +633,10 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         if (is_array($value)) {
             foreach ($value as $key => $val) {
-                $this->params[$value[$key] = self::PREFIX. ++$this->count] = $val;
+                $this->params[$value[$key] = self::PREFIX . ++$this->count] = $val;
             }
         } elseif (is_string($value)) {
-            $ph = self::PREFIX. ++$this->count;
+            $ph = self::PREFIX . ++$this->count;
             $this->params[$ph] = $value;
             $value = $ph;
         }
@@ -656,9 +657,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $value = $this->filterParam($value);
         $name = strtolower($name);
         $expressions = new Expressions([
-            'source' => ('where' === $name ? $this->table.'.' : '') . $field,
+            'source' => ('where' === $name ? $this->table . '.' : '') . $field,
             'operator' => $operator,
-            'target'=> (
+            'target' => (
                 is_array($value)
                 ? new WrapExpressions(
                     'between' === strtolower($operator)
@@ -688,7 +689,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         $this->join = new Expressions([
             'source' => $this->join ?? '',
-            'operator' => $type. ' JOIN',
+            'operator' => $type . ' JOIN',
             'target' => new Expressions(
                 [
                         'source' => $table,
@@ -713,7 +714,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $this->expressions[] = new Expressions(['operator' => $delimiter, 'target' => $expressions]);
         }
     }
-    
+
     /**
      * helper function to add condition into WHERE.
      * @param Expressions $exp The expression will be concat into WHERE or SET statement.
@@ -738,7 +739,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     protected function processEvent($event, array $data_to_pass = [])
     {
-        if (is_array($event)=== false) {
+        if (is_array($event) === false) {
             $event = [ $event ];
         }
 
