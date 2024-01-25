@@ -1,11 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace flight\database;
 
 interface DatabaseInterface
 {
-
     /**
      * Prepares a query for execution and returns a statement
      *

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace flight;
@@ -9,13 +10,12 @@ namespace flight;
  */
 class WrapExpressions extends Expressions
 {
-
     public string $start = '(';
     public string $end = ')';
     public string $delimiter = ',';
 
     public function __toString()
     {
-        return $this->start . implode(($this->delimiter ? $this->delimiter: ','), $this->target) . $this->end;
+        return $this->start . implode(($this->delimiter ? $this->delimiter : ','), $this->target) . $this->end;
     }
 }

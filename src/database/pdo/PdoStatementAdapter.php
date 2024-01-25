@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace flight\database\pdo;
@@ -10,7 +11,6 @@ use PDOStatement;
 
 class PdoStatementAdapter implements DatabaseStatementInterface
 {
-
     private PDOStatement $statement;
 
     /**

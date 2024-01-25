@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace flight;
@@ -19,6 +20,6 @@ class Expressions extends Base
     public $target;
     public function __toString()
     {
-        return $this->source. ' '. $this->operator. ' '. $this->target;
+        return $this->source . ' ' . $this->operator . ' ' . $this->target;
     }
 }

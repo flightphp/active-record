@@ -30,7 +30,7 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $mysqli_stmt = $this->createMock(mysqli_stmt::class);
         $mysqli_stmt->method('execute')->willReturn(true);
         $mysqli->method('prepare')->willReturn($mysqli_stmt);
-        $connection = new class($mysqli) extends MysqliAdapter {
+        $connection = new class ($mysqli) extends MysqliAdapter {
             public function lastInsertId()
             {
                 return 1;
@@ -49,7 +49,7 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $mysqli_stmt = $this->createMock(mysqli_stmt::class);
         $mysqli_stmt->method('execute')->will($this->onConsecutiveCalls(true, true));
         $mysqli->method('prepare')->willReturn($mysqli_stmt);
-        $connection = new class($mysqli) extends MysqliAdapter {
+        $connection = new class ($mysqli) extends MysqliAdapter {
             public function lastInsertId()
             {
                 return 1;
@@ -69,7 +69,7 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $this->assertNotEquals($original_password, $user->password);
         $this->assertEquals($original_id, $user->id);
     }
-    
+
     public function testQuery()
     {
         $mysqli = $this->createMock(mysqli::class);
@@ -80,7 +80,7 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $mysqli_stmt->method('bind_param')->willReturn(true);
         $mysqli_stmt->method('get_result')->willReturn($mysqli_result);
         $mysqli->method('prepare')->willReturn($mysqli_stmt);
-        $connection = new class($mysqli) extends MysqliAdapter {
+        $connection = new class ($mysqli) extends MysqliAdapter {
             public function lastInsertId()
             {
                 return 1;
@@ -103,7 +103,7 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $mysqli_stmt->method('execute')->willReturn(true);
         $mysqli_stmt->method('bind_param')->willReturn(true);
         $mysqli->method('prepare')->willReturn($mysqli_stmt);
-        $connection = new class($mysqli) extends MysqliAdapter {
+        $connection = new class ($mysqli) extends MysqliAdapter {
             public function lastInsertId()
             {
                 return 1;
@@ -124,7 +124,7 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
     {
         $mysqli_stmt = $this->createMock(mysqli_stmt::class);
         $mysqli_stmt->method('execute')->willReturn(false);
-        $MysqliStatementAdapter = new class($mysqli_stmt) extends MysqliStatementAdapter {
+        $MysqliStatementAdapter = new class ($mysqli_stmt) extends MysqliStatementAdapter {
             protected function getErrorList(): array
             {
                 return [ [ 'sqlstate' => 'HY000', 'errno' => 1, 'error' => 'test_statement'] ];
@@ -142,7 +142,7 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $mysqli_result->method('fetch_assoc')->willReturn(['id' => 1, 'name' => 'demo', 'password' => md5('demo')]);
         $mysqli_stmt->method('get_result')->willReturn($mysqli_result);
 
-        $MysqliStatementAdapter = new class($mysqli_stmt) extends MysqliStatementAdapter {
+        $MysqliStatementAdapter = new class ($mysqli_stmt) extends MysqliStatementAdapter {
         };
         $user = new class extends User {
             public function __construct()
@@ -158,7 +158,7 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
     {
         $mysqli = $this->createMock(mysqli::class);
         $mysqli->method('prepare')->willReturn(false);
-        $MysqliAdapter = new class($mysqli) extends MysqliAdapter {
+        $MysqliAdapter = new class ($mysqli) extends MysqliAdapter {
             protected function getErrorList(): array
             {
                 return [ [ 'sqlstate' => 'HY000', 'errno' => 1, 'error' => 'test_statement'] ];
