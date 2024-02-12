@@ -233,8 +233,10 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue($contact->delete());
         $new_contact = new Contact(new PDO('sqlite:test.db'));
         $new_user = new User(new PDO('sqlite:test.db'));
-        $this->assertFalse($new_contact->eq('id', $cid)->find());
-        $this->assertFalse($new_user->find($uid));
+        $this->assertInstanceOf(Contact::class, $new_contact->eq('id', $cid)->find());
+        $this->assertEmpty($new_contact->id);
+        $this->assertInstanceOf(User::class, $new_user->find($uid));
+        $this->assertEmpty($new_user->id);
     }
 
     public function testFindEvents()

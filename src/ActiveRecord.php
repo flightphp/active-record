@@ -67,91 +67,6 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     public const BELONGS_TO = 'belongs_to';
     public const HAS_MANY = 'has_many';
     public const HAS_ONE = 'has_one';
-    public const PREFIX = ':ph';
-
-    /**
-     * @var array mapping the function name and the operator, to build Expressions in WHERE condition.
-     * <pre>user can call it like this:
-     *      $user->isNotNull()->eq('id', 1);
-     * will create Expressions can explain to SQL:
-     *      WHERE user.id IS NOT NULL AND user.id = :ph1</pre>
-     */
-    protected array $operators = [
-        'equal' => '=', 'eq' => '=',
-        'notEqual' => '<>', 'ne' => '<>',
-        'greaterThan' => '>', 'gt' => '>',
-        'lessThan' => '<', 'lt' => '<',
-        'greaterThanOrEqual' => '>=', 'ge' => '>=','gte' => '>=',
-        'lessThanOrEqual' => '<=', 'le' => '<=','lte' => '<=',
-        'between' => 'BETWEEN',
-        'like' => 'LIKE',
-        'notLike' => 'NOT LIKE',
-        'in' => 'IN',
-        'notIn' => 'NOT IN',
-        'isNull' => 'IS NULL',
-        'isNotNull' => 'IS NOT NULL',
-        'notNull' => 'IS NOT NULL',
-    ];
-    /**
-     * @var array Part of SQL, mapping the function name and the operator to build SQL Part.
-     * <pre>call function like this:
-     *      $user->order('id desc', 'name asc')->limit(2,1);
-     *  can explain to SQL:
-     *      ORDER BY id desc, name asc limit 2,1</pre>
-     */
-    protected array $sqlParts = [
-        'select' => 'SELECT',
-        'from' => 'FROM',
-        'set' => 'SET',
-        'where' => 'WHERE',
-        'group' => 'GROUP BY','groupBy' => 'GROUP BY',
-        'having' => 'HAVING',
-        'order' => 'ORDER BY','orderBy' => 'ORDER BY',
-        'limit' => 'LIMIT',
-        'offset' => 'OFFSET',
-        'top' => 'TOP',
-    ];
-    /**
-     * @var array property to stored the default Sql Expressions values.
-     */
-    protected array $defaultSqlExpressions = [
-        'expressions'   => [],
-        'wrap'          => false,
-        'select'        => null,
-        'insert'        => null,
-        'update'        => null,
-        'set'           => null,
-        'delete'        => 'DELETE ',
-        'join'          => null,
-        'from'          => null,
-        'values'        => null,
-        'where'         => null,
-        'having'        => null,
-        'limit'         => null,
-        'order'         => null,
-        'group'         => null
-    ];
-
-    /**
-     * Possible Events that can be run on the Active Record
-     *
-     * @var array
-     */
-    protected array $events = [
-        'beforeInsert',
-        'afterInsert',
-        'beforeUpdate',
-        'afterUpdate',
-        'beforeSave',
-        'afterSave',
-        'beforeDelete',
-        'afterDelete',
-        'beforeFind',
-        'afterFind',
-        'beforeFindAll',
-        'afterFindAll',
-        'onConstruct'
-    ];
 
     /**
      * @var array Stored the SQL Expressions of the SQL.
@@ -248,17 +163,17 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     public function __call($name, $args)
     {
         $name = str_ireplace('by', '', $name);
-        if (isset($this->operators[$name]) === true) {
+        if (isset(ActiveRecordData::OPERATORS[$name]) === true) {
             $field = $args[0];
-            $operator = $this->operators[$name];
+            $operator = ActiveRecordData::OPERATORS[$name];
             $value = isset($args[1]) ? $args[1] : null;
             $last_arg = end($args);
             $and_or_or = is_string($last_arg) && strtolower($last_arg) === 'or' ? 'OR' : 'AND';
 
             $this->addCondition($field, $operator, $value, $and_or_or);
-        } elseif (in_array($name, array_keys($this->sqlParts))) {
+        } elseif (in_array($name, array_keys(ActiveRecordData::SQL_PARTS))) {
             $this->{$name} = new Expressions([
-                'operator' => $this->sqlParts[$name],
+                'operator' => ActiveRecordData::SQL_PARTS[$name],
                 'target' => implode(', ', $args)
             ]);
         }
@@ -270,7 +185,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function __set($var, $val)
     {
-        if (array_key_exists($var, $this->sqlExpressions) || array_key_exists($var, $this->defaultSqlExpressions)) {
+        if (array_key_exists($var, $this->sqlExpressions) || array_key_exists($var, ActiveRecordData::DEFAULT_SQL_EXPRESSIONS)) {
             $this->sqlExpressions[$var] = $val;
         } elseif (isset($this->relations[$var]) === true && $val instanceof self) {
             $this->relations[$var] = $val;
@@ -515,7 +430,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $obj->clearData();
         $sth = $this->execute($sql, $param);
         if ($single) {
-            return $sth->fetch($obj) ? $obj->dirty() : false;
+            // fetch results into the object
+            $sth->fetch($obj);
+            // clear any dirty data
+            $obj->dirty();
+            return $obj;
         }
         $result = [];
         while ($obj = $sth->fetch($obj)) {
@@ -533,7 +452,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         $relation = $this->relations[$name];
         if (is_array($relation) === true) {
-            // self::BELONGS_TO etc
+            // ActiveRecordData::BELONGS_TO etc
             $relation_type_or_object_name = $relation[0];
             $relation_class = $relation[1] ?? '';
             $relation_local_key = $relation[2] ?? '';
@@ -633,10 +552,10 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         if (is_array($value)) {
             foreach ($value as $key => $val) {
-                $this->params[$value[$key] = self::PREFIX . ++$this->count] = $val;
+                $this->params[$value[$key] = ActiveRecordData::PREFIX . ++$this->count] = $val;
             }
         } elseif (is_string($value)) {
-            $ph = self::PREFIX . ++$this->count;
+            $ph = ActiveRecordData::PREFIX . ++$this->count;
             $this->params[$ph] = $value;
             $value = $ph;
         }
@@ -733,7 +652,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * Process an event that's been set.
      *
-     * @param string|array $event   The name (or array of names) of the event from $this->events
+     * @param string|array $event   The name (or array of names) of the event from ActiveRecordData::EVENTS
      * @param array  $data_to_pass Usually ends up being $this
      * @return void
      */
@@ -744,7 +663,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
 
         foreach ($event as $event_name) {
-            if (method_exists($this, $event_name) && in_array($event_name, $this->events, true) === true) {
+            if (method_exists($this, $event_name) && in_array($event_name, ActiveRecordData::EVENTS, true) === true) {
                 $this->{$event_name}(...$data_to_pass);
             }
         }
@@ -765,6 +684,10 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function __debugInfo()
     {
+        $data = clone $this;
+        unset($data->relations);
+        unset($data->operators);
+
         return $this->data + $this->customData;
     }
 }
