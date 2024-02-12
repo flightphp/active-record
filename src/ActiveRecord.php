@@ -684,10 +684,6 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function __debugInfo()
     {
-        $data = clone $this;
-        unset($data->relations);
-        unset($data->operators);
-
         return $this->data + $this->customData;
     }
 }
