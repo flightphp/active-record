@@ -676,14 +676,4 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         return $this->data + $this->customData;
     }
-
-    /**
-     * Only need it to print out a few things, not every single things ever.
-     *
-     * @return array
-     */
-    public function __debugInfo()
-    {
-        return $this->data + $this->customData;
-    }
 }
