@@ -30,7 +30,7 @@ Now you can setup a new class to represent this table:
 class User extends flight\ActiveRecord {
 	public function __construct($database_connection)
 	{
-		parent::__construct($database_connection, [ 'table' => 'users' ]);
+		parent::__construct($database_connection, 'users', [ /* custom values */ ]);
 	}
 }
 ```
