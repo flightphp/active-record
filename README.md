@@ -28,9 +28,9 @@ Now you can setup a new class to represent this table:
  * @property string $password
  */ 
 class User extends flight\ActiveRecord {
-	public function __construct($database_connection)
+	public function __construct($databaseConnection)
 	{
-		parent::__construct($database_connection, 'users', [ /* custom values */ ]);
+		parent::__construct($databaseConnection, 'users', [ /* custom values */ ]);
 	}
 }
 ```
