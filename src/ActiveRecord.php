@@ -672,6 +672,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * @inheritDoc
      */
+	#[\ReturnTypeWillChange]
     public function jsonSerialize()
     {
         return $this->data + $this->customData;
