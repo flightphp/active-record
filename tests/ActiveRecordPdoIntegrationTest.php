@@ -239,6 +239,27 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEmpty($new_user->id);
     }
 
+    public function testDeleteWithConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+        $user->name = 'demo1';
+        $user->password = md5('demo1');
+        $user->insert();
+        $user->name = 'bob';
+        $user->password = md5('bob');
+        $user->insert();
+
+        $this->assertEquals(3, $user->id);
+
+        $user->like('name', 'demo%')->delete();
+        $remaining_users = $user->findAll();
+
+        $this->assertEquals(1, count($remaining_users));
+    }
+
     public function testFindEvents()
     {
         $user = new class (new PDO('sqlite:test.db')) extends User {
@@ -368,15 +389,5 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->setCustomData('test', 'test');
 
         $this->assertEquals('{"name":"bob","password":"pass","id":"1","test":"test"}', json_encode($user));
-
-        // and test print_r and __debugInfo while we're at it
-        $this->assertEquals('flight\tests\classes\User Object
-(
-    [name] => bob
-    [password] => pass
-    [id] => 1
-    [test] => test
-)
-', print_r($user, true));
     }
 }

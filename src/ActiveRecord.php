@@ -260,14 +260,26 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->customData[$key] = $value;
     }
 
-    public function clearData(): self
+    /**
+     * Clears the data stored in the object, and resets all params and SQL expressions.
+     *
+     * @param bool $include_query_data If set to true, will also reset the query data.
+     *
+     * @return ActiveRecord return $this, can using chain method calls.
+     */
+    public function reset(bool $include_query_data = true): self
     {
         $this->data = [];
+        $this->customData = [];
+        if ($include_query_data === true) {
+            $this->resetQueryData();
+        }
         return $this;
     }
 
     /**
-     * function to reset the $params and $sqlExpressions.
+     * Function to reset the $params and $sqlExpressions.
+     *
      * @return ActiveRecord return $this, can using chain method calls.
      */
     protected function resetQueryData(): self
@@ -334,7 +346,10 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     public function delete()
     {
         $this->processEvent('beforeDelete', [ $this ]);
-        $result = $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['delete', 'from', 'where']), $this->params);
+        if (empty($this->sqlExpressions['where'])) {
+            $this->eq($this->primaryKey, $this->{$this->primaryKey});
+        }
+        $result = $this->execute($this->buildSql(['delete', 'from', 'where']), $this->params);
         $this->processEvent('afterDelete', [ $this ]);
         return $result instanceof DatabaseStatementInterface;
     }
@@ -410,6 +425,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
         $statement->execute($params);
 
+        // Now that the query has run, reset the data in the object
+        $this->resetQueryData();
+
         return $statement;
     }
 
@@ -427,7 +445,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $obj = $obj ?: new $called_class($this->databaseConnection);
 
         // Since we are finding a new record, this makes sure that nothing is persisted on the object since we're really looking for a new object.
-        $obj->clearData();
+        $obj->reset(false);
         $sth = $this->execute($sql, $param);
         if ($single) {
             // fetch results into the object
@@ -672,7 +690,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * @inheritDoc
      */
-	#[\ReturnTypeWillChange]
+    #[\ReturnTypeWillChange]
     public function jsonSerialize()
     {
         return $this->data + $this->customData;
