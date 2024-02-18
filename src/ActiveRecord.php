@@ -359,17 +359,19 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function insert(): ActiveRecord
     {
+        // execute this before anything else, this could change $this->dirty
+        $this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
+
         if (count($this->dirty) === 0) {
             return $this->resetQueryData();
         }
+
         $value = $this->filterParam($this->dirty);
         $this->insert = new Expressions([
             'operator' => 'INSERT INTO ' . $this->table,
             'target' => new WrapExpressions(['target' => array_keys($this->dirty)])
         ]);
         $this->values = new Expressions(['operator' => 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
-
-        $this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
 
         $this->execute($this->buildSql(['insert', 'values']), $this->params);
         $this->{$this->primaryKey} = $this->databaseConnection->lastInsertId();

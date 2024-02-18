@@ -30,7 +30,8 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->ActiveRecord->execute("CREATE TABLE IF NOT EXISTS user (
             id INTEGER PRIMARY KEY, 
             name TEXT, 
-            password TEXT 
+            password TEXT,
+			created_dt TEXT
         );");
         $this->ActiveRecord->execute("CREATE TABLE IF NOT EXISTS contact (
             id INTEGER PRIMARY KEY, 
@@ -100,6 +101,22 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->save();
         $this->assertEquals($insert_id, $user->id);
         $this->assertEquals('new name', $user->name);
+    }
+
+    public function testBeforeInsertUsingSaveWithMixedInput()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            protected function beforeInsert(self $self)
+            {
+                $self->created_dt = '2024-02-18 12:00:00';
+            }
+        };
+        $user->name = 'bob';
+        $user->password = 'test';
+        $user->save();
+
+        $this->assertEquals('test', $user->password);
+        $this->assertEquals('2024-02-18 12:00:00', $user->created_dt);
     }
 
     public function testRelations()
@@ -389,5 +406,47 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->setCustomData('test', 'test');
 
         $this->assertEquals('{"name":"bob","password":"pass","id":"1","test":"test"}', json_encode($user));
+    }
+
+    public function testReset()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function getSqlExpressions()
+            {
+                return $this->sqlExpressions;
+            }
+            public function getParams()
+            {
+                return $this->params;
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->reset();
+        $this->assertEmpty($user->name);
+        $this->assertEmpty($user->password);
+        $this->assertEmpty($user->getSqlExpressions());
+        $this->assertEmpty($user->getParams());
+    }
+
+    public function testResetKeepQueryData()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function getSqlExpressions()
+            {
+                return $this->sqlExpressions;
+            }
+            public function getParams()
+            {
+                return $this->params;
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->eq('id', 1);
+        $user->reset(false);
+        $this->assertEmpty($user->name);
+        $this->assertEmpty($user->password);
+        $this->assertGreaterThan(0, count($user->getSqlExpressions()));
     }
 }
