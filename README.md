@@ -95,7 +95,7 @@ composer require flightphp/active-record
 
 ## Documentation
 
-Head over to the [documentation page](https://docs.flightphp.com/plugins/active-record) to learn more about usage and how cool this thing is! :)
+Head over to the [documentation page](https://docs.flightphp.com/awesome-plugins/active-record) to learn more about usage and how cool this thing is! :)
 
 ## License
 
