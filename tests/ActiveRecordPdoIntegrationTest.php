@@ -449,4 +449,14 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEmpty($user->password);
         $this->assertGreaterThan(0, count($user->getSqlExpressions()));
     }
+
+	public function testAssignValAndThenAssignNull() {
+		$user = new User(new PDO('sqlite:test.db'));
+		$user->name = 'bob';
+		$user->password = 'pass';
+		$user->save();
+		$user->name = null;
+		$user->save();
+		$this->assertEmpty($user->name);
+	}
 }

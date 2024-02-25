@@ -394,7 +394,6 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
 
         $this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
-
         $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
 
         $this->processEvent([ 'afterUpdate', 'afterSave' ], [ $this ]);
@@ -578,7 +577,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $ph = ActiveRecordData::PREFIX . ++$this->count;
             $this->params[$ph] = $value;
             $value = $ph;
-        }
+        } elseif ($value === null) {
+			$value = 'NULL';
+		}
         return $value;
     }
 
@@ -593,7 +594,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function addCondition(string $field, string $operator, $value, string $delimiter = 'AND', string $name = 'where')
     {
-        $value = $this->filterParam($value);
+		// This will catch unique conditions such as IS NULL, IS NOT NULL, etc
+		// You only need to filter by a param if there's a param to really filter by
+		if(stripos($operator, 'NULL') === false) {
+	        $value = $this->filterParam($value);
+		}
         $name = strtolower($name);
         $expressions = new Expressions([
             'source' => ('where' === $name ? $this->table . '.' : '') . $field,
