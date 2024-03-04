@@ -700,6 +700,16 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     #[\ReturnTypeWillChange]
     public function jsonSerialize()
     {
-        return $this->data + $this->customData;
+        return $this->toArray();
     }
+
+	/**
+	 * This will return the data in the object as an array
+	 *
+	 * @return array
+	 */
+	public function toArray(): array
+	{
+		return $this->data + $this->customData;
+	}
 }
