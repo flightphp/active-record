@@ -14,10 +14,6 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     {
         $pdo_mock = $this->createStub(PDO::class);
         $record = new class ($pdo_mock) extends ActiveRecord {
-            public function getData()
-            {
-                return $this->data;
-            }
             public function getDirty()
             {
                 return $this->dirty;
@@ -101,5 +97,24 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
             }
         };
         $this->assertEquals('test_table', $record->getTable());
+    }
+
+    public function testIsDirty()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+        };
+        $record->name = 'John';
+        $this->assertTrue($record->isDirty());
+        unset($record->name);
+        $this->assertFalse($record->isDirty());
+    }
+
+    public function testCopyFrom()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+        };
+        $record->copyFrom(['name' => 'John']);
+        $this->assertEquals('John', $record->name);
+        $this->assertEquals(['name' => 'John'], $record->getData());
     }
 }

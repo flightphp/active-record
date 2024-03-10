@@ -450,13 +450,63 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertGreaterThan(0, count($user->getSqlExpressions()));
     }
 
-	public function testAssignValAndThenAssignNull() {
-		$user = new User(new PDO('sqlite:test.db'));
-		$user->name = 'bob';
-		$user->password = 'pass';
+    public function testAssignValAndThenAssignNull()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'bob';
+        $user->password = 'pass';
+        $user->save();
+        $user->name = null;
+        $user->save();
+        $this->assertEmpty($user->name);
+    }
+
+    public function testIsHydratedBadFind()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'bob';
+        $user->password = 'pass';
+        $user->save();
+        $user->find(0);
+        $this->assertFalse($user->isHydrated());
+    }
+
+    public function testIsHydratedGoodFind()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'bob';
+        $user->password = 'pass';
+        $user->save();
+        $user->find(1);
+        $this->assertTrue($user->isHydrated());
+    }
+
+    public function testIsHydratedGoodFindAll()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'bob';
+        $user->password = 'pass';
+        $user->save();
+        $users = $user->findAll();
+        $this->assertTrue($users[0]->isHydrated());
+    }
+
+	public function testRelationsCascadingSave()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
+		$user->name = 'bobby';
+		$user->contact->user_id = $user->id;
+		$user->contact->email = 'test@amail.com';
+		$user->contact->address = 'test address';
 		$user->save();
-		$user->name = null;
-		$user->save();
-		$this->assertEmpty($user->name);
-	}
+
+		$this->assertEquals($user->id, $user->contact->user_id);
+		$this->assertFalse($user->contact->isDirty());
+		$this->assertGreaterThan(0, $user->contact->id);
+		$this->assertFalse($user->isDirty());
+    }
 }

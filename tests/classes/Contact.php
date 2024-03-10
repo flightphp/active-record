@@ -4,6 +4,12 @@ namespace flight\tests\classes;
 
 use flight\ActiveRecord;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property string $email
+ * @property string $address
+ */
 class Contact extends ActiveRecord
 {
     public string $table = 'contact';

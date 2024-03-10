@@ -12,7 +12,7 @@ abstract class Base
     /**
      * @var array Stored the attributes of the current object
      */
-    public array $data = [];
+    protected array $data = [];
 
     /**
      * Construct

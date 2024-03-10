@@ -123,6 +123,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected int $count = 0;
 
     /**
+     * @var boolean This means that if find() or findAll() actually finds a record in the database
+     */
+    protected bool $isHydrated = false;
+
+    /**
      * The construct
      *
      * @param mixed   $databaseConnection  Database object (PDO, mysqli, etc)
@@ -231,6 +236,17 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
 
     /**
+     * Checks isset for magic properties
+     *
+     * @param mixed $name the key name to check
+     * @return boolean
+     */
+    public function __isset($name)
+    {
+        return isset($this->data[$name]) === true || isset($this->relations[$name]) === true || isset($this->customData[$name]) === true;
+    }
+
+    /**
      * Transforms the raw connection into a database connection usable by this class
      *
      * @param mixed $rawConnection Raw connection
@@ -293,11 +309,47 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      * @param array $dirty The dirty data will be set, or empty array to reset the dirty data.
      * @return ActiveRecord return $this, can using chain method calls.
      */
-    public function dirty(array $dirty = [])
+    public function dirty(array $dirty = []): self
     {
         $this->dirty = $dirty;
         $this->data = array_merge($this->data, $dirty);
         return $this;
+    }
+
+    /**
+     * Let's you know if this model has been modified
+     *
+     * @return boolean
+     */
+    public function isDirty(): bool
+    {
+        return count($this->dirty) > 0;
+    }
+
+    /**
+     * Alias for dirty
+     *
+     * @param array $data data to copy into the model
+     * @return self
+     */
+    public function copyFrom(array $data = []): self
+    {
+        return $this->dirty($data);
+    }
+
+    /**
+     * If this model has been hydrated with data because of a find() or findAll() call
+     *
+     * @return boolean
+     */
+    public function isHydrated(): bool
+    {
+        return $this->isHydrated;
+    }
+
+    public function getData(): array
+    {
+        return $this->data;
     }
 
     /**
@@ -409,11 +461,22 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     public function save(): ActiveRecord
     {
         if ($this->{$this->primaryKey}) {
-            return $this->update();
+            $record = $this->update();
         } else {
-            return $this->insert();
+            $record = $this->insert();
         }
+
+        if (count($this->relations) > 0) {
+            foreach ($this->relations as $relation) {
+                if ($relation instanceof ActiveRecord && $relation->isDirty() === true) {
+                    $relation->save();
+                }
+            }
+        }
+
+		return $record;
     }
+
     /**
      * helper function to exec sql.
      * @param string $sql The SQL need to be execute.
@@ -448,16 +511,19 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         // Since we are finding a new record, this makes sure that nothing is persisted on the object since we're really looking for a new object.
         $obj->reset(false);
         $sth = $this->execute($sql, $param);
-        if ($single) {
+        if ($single === true) {
             // fetch results into the object
             $sth->fetch($obj);
             // clear any dirty data
             $obj->dirty();
+            $obj->isHydrated = count($obj->getData()) > 0;
             return $obj;
         }
         $result = [];
         while ($obj = $sth->fetch($obj)) {
-            $result[] = clone $obj->dirty();
+            $new_obj = clone $obj->dirty();
+            $new_obj->isHydrated = count($new_obj->getData()) > 0;
+            $result[] = $new_obj;
         }
         return $result;
     }
@@ -578,8 +644,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $this->params[$ph] = $value;
             $value = $ph;
         } elseif ($value === null) {
-			$value = 'NULL';
-		}
+            $value = 'NULL';
+        }
         return $value;
     }
 
@@ -594,11 +660,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function addCondition(string $field, string $operator, $value, string $delimiter = 'AND', string $name = 'where')
     {
-		// This will catch unique conditions such as IS NULL, IS NOT NULL, etc
-		// You only need to filter by a param if there's a param to really filter by
-		if(stripos($operator, 'NULL') === false) {
-	        $value = $this->filterParam($value);
-		}
+        // This will catch unique conditions such as IS NULL, IS NOT NULL, etc
+        // You only need to filter by a param if there's a param to really filter by
+        if (stripos($operator, 'NULL') === false) {
+            $value = $this->filterParam($value);
+        }
         $name = strtolower($name);
         $expressions = new Expressions([
             'source' => ('where' === $name ? $this->table . '.' : '') . $field,
@@ -703,13 +769,13 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         return $this->toArray();
     }
 
-	/**
-	 * This will return the data in the object as an array
-	 *
-	 * @return array
-	 */
-	public function toArray(): array
-	{
-		return $this->data + $this->customData;
-	}
+    /**
+     * This will return the data in the object as an array
+     *
+     * @return array
+     */
+    public function toArray(): array
+    {
+        return $this->data + $this->customData;
+    }
 }
