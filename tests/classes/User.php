@@ -4,6 +4,12 @@ namespace flight\tests\classes;
 
 use flight\ActiveRecord;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $password
+ * @property string $created_dt
+ */
 class User extends ActiveRecord
 {
     public string $table = 'user';
