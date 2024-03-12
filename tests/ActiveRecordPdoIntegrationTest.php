@@ -3,6 +3,7 @@
 namespace flight\tests;
 
 use flight\ActiveRecord;
+use flight\database\pdo\PdoAdapter;
 use flight\tests\classes\Contact;
 use flight\tests\classes\User;
 use PDO;
@@ -491,22 +492,62 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue($users[0]->isHydrated());
     }
 
-	public function testRelationsCascadingSave()
+    public function testRelationsCascadingSave()
     {
         $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
 
-		$user->name = 'bobby';
-		$user->contact->user_id = $user->id;
-		$user->contact->email = 'test@amail.com';
-		$user->contact->address = 'test address';
-		$user->save();
+        $user->name = 'bobby';
+        $user->contact->user_id = $user->id;
+        $user->contact->email = 'test@amail.com';
+        $user->contact->address = 'test address';
+        $user->save();
 
-		$this->assertEquals($user->id, $user->contact->user_id);
-		$this->assertFalse($user->contact->isDirty());
-		$this->assertGreaterThan(0, $user->contact->id);
-		$this->assertFalse($user->isDirty());
+        $this->assertEquals($user->id, $user->contact->user_id);
+        $this->assertFalse($user->contact->isDirty());
+        $this->assertGreaterThan(0, $user->contact->id);
+        $this->assertFalse($user->isDirty());
+    }
+
+    public function testSetDatabaseConnection()
+    {
+        $user = new User();
+        $user->setDatabaseConnection(new PDO('sqlite:test.db'));
+        $user->name = 'bob';
+        $user->password = 'pass';
+        $user->save();
+
+        $this->assertGreaterThan(0, $user->id);
+    }
+
+    public function testSetDatabaseConnectionWithAdapter()
+    {
+        $user = new User();
+        $user->setDatabaseConnection(new PdoAdapter(new PDO('sqlite:test.db')));
+        $user->name = 'bob';
+        $user->password = 'pass';
+        $user->save();
+
+        $this->assertGreaterThan(0, $user->id);
+    }
+
+    public function testRelationWithProtectedKeyword()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
+        $contact = new class (new PDO('sqlite:test.db')) extends ActiveRecord {
+            protected array $relations = [
+                'group' => [self::HAS_ONE, User::class, 'user_id']
+            ];
+        };
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('group is a protected keyword and cannot be used as a relation name');
+        $contact->group->id;
     }
 }
