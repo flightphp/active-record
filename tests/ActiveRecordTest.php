@@ -117,4 +117,27 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('John', $record->name);
         $this->assertEquals(['name' => 'John'], $record->getData());
     }
+
+	public function testIsset()
+	{
+		$record = new class (null, 'test_table') extends ActiveRecord {
+		};
+		$record->name = 'John';
+		$this->assertTrue(isset($record->name));
+		$this->assertFalse(isset($record->email));
+	}
+
+	public function testMultipleJoins()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+			public function query(string $sql, array $param = [], ?ActiveRecord $obj = null, bool $single = false)
+			{
+				return $this;
+			}
+        };
+        $record->join('table1', 'table1.some_id = test_table.id');
+		$record->join('table2', 'table2.some_id = table1.id');
+        $result = $record->find()->getBuiltSql();
+		$this->assertEquals('SELECT test_table.* FROM test_table  LEFT JOIN table1 ON table1.some_id = test_table.id LEFT JOIN table2 ON table2.some_id = table1.id       LIMIT 1  ', $result);
+    }
 }

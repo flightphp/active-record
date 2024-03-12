@@ -78,6 +78,18 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     protected array $sqlExpressions = [];
 
+	/**
+	 * @var string SQL that is built to be used by execute()
+	 */
+	protected string $built_sql = '';
+
+	/**
+	 * Captures all the joins that are made
+	 *
+	 * @var Expressions|null
+	 */
+	protected ?Expressions $join = null;
+
     /**
      * Database connection
      *
@@ -361,6 +373,20 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         return $this->databaseConnection;
     }
 
+	/**
+	 * set the database connection.
+	 * @param DatabaseInterface|mysqli|PDO $databaseConnection
+	 * @return void
+	 */
+	public function setDatabaseConnection($databaseConnection): void
+	{
+		if (($databaseConnection instanceof DatabaseInterface) === true) {
+            $this->databaseConnection = $databaseConnection;
+        } else {
+			$this->transformAndPersistConnection($databaseConnection);
+		}
+	}
+
     /**
      * function to find one record and assign in to current object.
      * @param int|string $id If call this function using this param, will find record by using this id. If not set, just find the first record in database.
@@ -535,6 +561,12 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     protected function &getRelation(string $name)
     {
+
+		// can't set the name of a relation to a protected keyword
+		if(in_array($name, ['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset'], true) === true) {
+			throw new Exception($name. ' is a protected keyword and cannot be used as a relation name');
+		}
+
         $relation = $this->relations[$name];
         if (is_array($relation) === true) {
             // ActiveRecordData::BELONGS_TO etc
@@ -604,8 +636,19 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
         //this code to debug info.
         //echo 'SQL: ', implode(' ', $sql_statements), "\n", "PARAMS: ", implode(', ', $this->params), "\n";
-        return implode(' ', $sql_statements);
+		$this->built_sql = implode(' ', $sql_statements);
+        return $this->built_sql;
     }
+
+	/**
+	 * Gets the built SQL after buildSql has been called
+	 *
+	 * @return string
+	 */
+	public function getBuiltSql(): string
+	{
+		return $this->built_sql;
+	}
     /**
      * make wrap when build the SQL expressions of WHERE.
      * @param string $op If give this param will build one WrapExpressions include the stored expressions add into WHERE. Otherwise will stored the expressions into array.
