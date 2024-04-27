@@ -451,12 +451,17 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         ]);
         $this->values = new Expressions(['operator' => 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
 
+		$intentionallyAssignedPrimaryKey = $this->dirty[$this->primaryKey] ?? null;
+
         $this->execute($this->buildSql(['insert', 'values']), $this->params);
-        $this->{$this->primaryKey} = $this->databaseConnection->lastInsertId();
+
+        $this->{$this->primaryKey} = $intentionallyAssignedPrimaryKey ?: $this->databaseConnection->lastInsertId();
 
         $this->processEvent([ 'afterInsert', 'afterSave' ], [ $this ]);
 
-        return $this->dirty()->resetQueryData();
+		$this->isHydrated = true;
+		
+        return $this->dirty();
     }
     /**
      * function to build update SQL, and update current record in database, just write the dirty data into database.
@@ -486,7 +491,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function save(): ActiveRecord
     {
-        if ($this->{$this->primaryKey}) {
+        if ($this->{$this->primaryKey} !== null && $this->isHydrated() === true) {
             $record = $this->update();
         } else {
             $record = $this->insert();

@@ -46,6 +46,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
     {
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS contact;");
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS user;");
+		$this->ActiveRecord->execute("DROP TABLE IF EXISTS my_text_table;");
     }
 
     public function testInsert()
@@ -550,4 +551,56 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->expectExceptionMessage('group is a protected keyword and cannot be used as a relation name');
         $contact->group->id;
     }
+
+	public function testTextBasedPrimaryKey() {
+		$this->ActiveRecord->execute("CREATE TABLE IF NOT EXISTS my_text_table (
+			my_pk TEXT NOT NULL PRIMARY KEY, 
+			data INTEGER, name TEXT
+		)");
+
+		$myTextTable = new class (new PDO('sqlite:test.db'), 'my_text_table', [ 'primaryKey' => 'my_pk' ]) extends ActiveRecord {
+		};
+
+		$my_pk = time();
+		$myTextTable->my_pk = $my_pk;
+		$myTextTable->data = 12345;
+
+		$this->assertTrue($myTextTable->isDirty());
+		$myTextTable->save();
+
+		$this->assertTrue($myTextTable->isHydrated());
+
+		$myTextTable->reset();
+
+		$myTextTable->find($my_pk);
+
+		$this->assertEquals($my_pk, $myTextTable->my_pk);
+		$this->assertEquals(12345, $myTextTable->data);
+		$this->assertTrue($myTextTable->isHydrated());
+	}
+
+	public function testTextBasedPrimaryKeyDuplicateKey() {
+		$this->ActiveRecord->execute("CREATE TABLE IF NOT EXISTS my_text_table (
+			my_pk TEXT NOT NULL PRIMARY KEY, 
+			data INTEGER, name TEXT
+		)");
+
+		$myTextTable = new class (new PDO('sqlite:test.db'), 'my_text_table', [ 'primaryKey' => 'my_pk' ]) extends ActiveRecord {
+		};
+
+		$my_pk = time();
+		$myTextTable->my_pk = $my_pk;
+		$myTextTable->data = 12345;
+		$myTextTable->save();
+
+		$myTextTable2 = new class (new PDO('sqlite:test.db'), 'my_text_table', [ 'primaryKey' => 'my_pk' ]) extends ActiveRecord {
+		};
+
+		$myTextTable2->my_pk = $my_pk;
+		$myTextTable2->data = 12345;
+
+		$this->expectException(\Exception::class);
+		$this->expectExceptionMessage('UNIQUE constraint failed: my_text_table.my_pk');
+		$myTextTable2->save();
+	}
 }
