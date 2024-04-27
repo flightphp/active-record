@@ -1,5 +1,8 @@
 # FlightPHP Active Record 
+[![Latest Stable Version](http://poser.pugx.org/flightphp/active-record/v)](https://packagist.org/packages/flightphp/active-record)
 [![License](https://poser.pugx.org/flightphp/active-record/license)](https://packagist.org/packages/flightphp/active-record)
+[![PHP Version Require](http://poser.pugx.org/flightphp/active-record/require/php)](https://packagist.org/packages/flightphp/active-record)
+[![Dependencies](http://poser.pugx.org/flightphp/active-record/dependents)](https://packagist.org/packages/flightphp/active-record)
 
 An active record is mapping a database entity to a PHP object. Spoken plainly, if you have a users table in your database, you can "translate" a row in that table to a `User` class and a `$user` object in your codebase. See [basic example](#basic-example).
 
