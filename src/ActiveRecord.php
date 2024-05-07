@@ -299,6 +299,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         $this->data = [];
         $this->customData = [];
+	$this->isHydrated = false;
         if ($include_query_data === true) {
             $this->resetQueryData();
         }
