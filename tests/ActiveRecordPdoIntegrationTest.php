@@ -323,6 +323,27 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('defaultpassword', $user->password);
     }
 
+	public function testUpdateEvents()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            protected function beforeUpdate(self $self)
+            {
+                $self->password = 'defaultpassword';
+            }
+
+            protected function afterUpdate(self $self)
+            {
+                $self->name .= ' after update';
+            }
+        };
+        $user->name = 'Bob';
+        $user->password = 'bobbytables';
+        $user->insert();
+		$user->update();
+        $this->assertEquals('Bob after update', $user->name);
+        $this->assertEquals('defaultpassword', $user->password);
+    }
+
     public function testLimit()
     {
         $user = new User(new PDO('sqlite:test.db'));
