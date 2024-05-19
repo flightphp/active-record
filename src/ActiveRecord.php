@@ -473,11 +473,13 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         if (count($this->dirty) === 0) {
             return $this->resetQueryData();
         }
+
+        $this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
+
         foreach ($this->dirty as $field => $value) {
             $this->addCondition($field, '=', $value, ',', 'set');
         }
 
-        $this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
         $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
 
         $this->processEvent([ 'afterUpdate', 'afterSave' ], [ $this ]);
