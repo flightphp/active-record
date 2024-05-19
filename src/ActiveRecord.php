@@ -470,17 +470,16 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function update(): ActiveRecord
     {
-        if (count($this->dirty) === 0) {
-            return $this->resetQueryData();
-        }
-
-        $this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
-
+		$this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
+        
         foreach ($this->dirty as $field => $value) {
             $this->addCondition($field, '=', $value, ',', 'set');
         }
 
-        $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
+		// Only update something if there is something to update
+		if(count($this->dirty) > 0) {
+			$this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
+		}
 
         $this->processEvent([ 'afterUpdate', 'afterSave' ], [ $this ]);
 
