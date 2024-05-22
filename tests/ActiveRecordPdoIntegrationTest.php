@@ -624,4 +624,53 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 		$this->expectExceptionMessage('UNIQUE constraint failed: my_text_table.my_pk');
 		$myTextTable2->save();
 	}
+
+	public function testWhereConditionWithSuppliedTableName() {
+		$user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
+		$contact = new Contact(new PDO('sqlite:test.db'));
+        $contact->user_id = $user->id;
+        $contact->email = 'test@amail.com';
+        $contact->address = 'test address';
+        $contact->insert();
+
+		$user
+			->select('user.*, contact.email')
+			->join('contact', 'contact.user_id = user.id')
+			->eq('user.name', 'demo')
+			->find();
+		
+		$this->assertEquals('demo', $user->name);
+		$this->assertEquals('test@amail.com', $user->email);
+	}
+
+	public function testWhereConditionWithFunctionName() {
+
+		$this->ActiveRecord->execute("CREATE TABLE IF NOT EXISTS json_test (
+            id INTEGER PRIMARY KEY, 
+            data TEXT, 
+			created_dt TEXT
+        );");
+
+		$json = new class(new PDO('sqlite:test.db')) extends ActiveRecord {
+			public function __construct($pdo) {
+				parent::__construct($pdo);
+				$this->table = 'json_test';
+				$this->primaryKey = 'id';
+			}
+		};
+        $json->data = '{"name": "demo", "email": "some-email@example.com"}';
+        $json->created_dt = gmdate('Y-m-d H:i:s');
+        $json->insert();
+		$json
+			->select('json_test.*, json_extract(data, "$.email") as email')
+			->eq('json_extract(data, "$.name")', 'demo')
+			->find();
+		
+		$this->assertEquals('demo', json_decode($json->data)->name);
+		$this->assertEquals('some-email@example.com', $json->email);
+	}
 }
