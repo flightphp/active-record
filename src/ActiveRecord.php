@@ -436,7 +436,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      * function to build insert SQL, and insert current record into database.
      * @return bool|ActiveRecord if insert success return current object
      */
-    public function insert(): ActiveRecord
+    public function insert(bool $isReplaceStatement = false): ActiveRecord
     {
         // execute this before anything else, this could change $this->dirty
         $this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
@@ -447,7 +447,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
         $value = $this->filterParam($this->dirty);
         $this->insert = new Expressions([
-            'operator' => 'INSERT INTO ' . $this->table,
+            'operator' => ($isReplaceStatement === false ? 'INSERT INTO ' : 'REPLACE INTO ') . $this->table,
             'target' => new WrapExpressions(['target' => array_keys($this->dirty)])
         ]);
         $this->values = new Expressions(['operator' => 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
@@ -463,6 +463,14 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->isHydrated = true;
 
         return $this->dirty();
+    }
+    /**
+     * function to build replace SQL, and replace current record in database.
+     * @return bool|ActiveRecord if replace success return current object
+     */
+    public function replace(): ActiveRecord
+    {
+        return $this->insert(true);
     }
     /**
      * function to build update SQL, and update current record in database, just write the dirty data into database.

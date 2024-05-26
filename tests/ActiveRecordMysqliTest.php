@@ -43,6 +43,30 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals(1, $user->id);
     }
 
+    public function testReplace()
+    {
+        $mysqli = $this->createMock(mysqli::class);
+        $mysqli_stmt = $this->createMock(mysqli_stmt::class);
+        $mysqli_stmt->method('execute')->will($this->onConsecutiveCalls(true, true));
+        $mysqli->method('prepare')->willReturn($mysqli_stmt);
+        $connection = new class ($mysqli) extends MysqliAdapter {
+            public function lastInsertId()
+            {
+                return 1;
+            }
+        };
+                $user = new User($connection);
+                $user->name = 'demo';
+                $user->insert();
+                $original_id = $user->id;
+                $user->id = 1;
+                $user->name = 'test';
+                $user->replace();
+                $this->assertGreaterThan(0, $user->id);
+                $this->assertEquals('test', $user->name);
+                $this->assertEquals($original_id, $user->id);
+    }
+
     public function testEdit()
     {
         $mysqli = $this->createMock(mysqli::class);

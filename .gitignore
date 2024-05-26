@@ -7,3 +7,4 @@ coverage/
 clover.xml
 .phpunit.result.cache
 .runway-config.json
+.DS_Store
