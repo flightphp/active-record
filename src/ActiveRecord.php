@@ -717,8 +717,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
         $name = strtolower($name);
 
-		// skip adding the `table.` prefix if it's already there or a function is being supplied.
-		$skip_table_prefix = (strpos($field, '.') !== false || strpos($field, '(') !== false);
+        // skip adding the `table.` prefix if it's already there or a function is being supplied.
+        $skip_table_prefix = (strpos($field, '.') !== false || strpos($field, '(') !== false);
         $expressions = new Expressions([
             'source' => ('where' === $name && $skip_table_prefix === false ? $this->table . '.' : '') . $field,
             'operator' => $operator,

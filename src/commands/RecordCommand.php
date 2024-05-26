@@ -21,8 +21,8 @@ class RecordCommand extends AbstractBaseCommand
         $this->argument('<table_name>', 'The name of the table to read from and create the active record');
         $this->argument('[class_name]', 'The name of the active record class to create');
         $this->usage(<<<TEXT
-			<bold>  make:record users</end> ## Creates a file named UserRecord.php based on the users table<eol/>
-			<bold>  make:record users Author</end> ## Creates a file named AuthorRecord.php based on the users table<eol/>
+            <bold>  make:record users</end> ## Creates a file named UserRecord.php based on the users table<eol/>
+            <bold>  make:record users Author</end> ## Creates a file named AuthorRecord.php based on the users table<eol/>
             TEXT);
     }
 
