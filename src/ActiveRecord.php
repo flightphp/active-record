@@ -299,7 +299,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         $this->data = [];
         $this->customData = [];
-	$this->isHydrated = false;
+        $this->isHydrated = false;
         if ($include_query_data === true) {
             $this->resetQueryData();
         }
@@ -452,7 +452,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         ]);
         $this->values = new Expressions(['operator' => 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
 
-		$intentionallyAssignedPrimaryKey = $this->dirty[$this->primaryKey] ?? null;
+        $intentionallyAssignedPrimaryKey = $this->dirty[$this->primaryKey] ?? null;
 
         $this->execute($this->buildSql(['insert', 'values']), $this->params);
 
@@ -460,8 +460,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
         $this->processEvent([ 'afterInsert', 'afterSave' ], [ $this ]);
 
-		$this->isHydrated = true;
-		
+        $this->isHydrated = true;
+
         return $this->dirty();
     }
     /**
@@ -470,16 +470,16 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function update(): ActiveRecord
     {
-		$this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
-        
+        $this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
+
         foreach ($this->dirty as $field => $value) {
             $this->addCondition($field, '=', $value, ',', 'set');
         }
 
-		// Only update something if there is something to update
-		if(count($this->dirty) > 0) {
-			$this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
-		}
+        // Only update something if there is something to update
+        if (count($this->dirty) > 0) {
+            $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
+        }
 
         $this->processEvent([ 'afterUpdate', 'afterSave' ], [ $this ]);
 
