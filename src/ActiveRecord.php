@@ -171,8 +171,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
 
     /**
-     * magic function to make calls witch in function mapping stored in $operators and $sqlPart.
-     * also can call function of PDO object.
+     * Magic function to make calls to ActiveRecordData::OPERATORS or ActiveRecordData::SQL_PARTS.
+     * also can call function of databaseConnection object.
      * @param string $name function name
      * @param array $args The arguments of the function.
      * @return mixed Return the result of callback or the current object to make chain method calls.
@@ -193,7 +193,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
                 'operator' => ActiveRecordData::SQL_PARTS[$name],
                 'target' => implode(', ', $args)
             ]);
-        }
+        } else if(method_exists($this->databaseConnection, $name) === true) {
+			return call_user_func_array([ $this->databaseConnection, $name ], $args);
+		}
         return $this;
     }
 

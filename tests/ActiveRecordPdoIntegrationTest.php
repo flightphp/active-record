@@ -4,6 +4,7 @@ namespace flight\tests;
 
 use flight\ActiveRecord;
 use flight\database\pdo\PdoAdapter;
+use flight\database\pdo\PdoStatementAdapter;
 use flight\tests\classes\Contact;
 use flight\tests\classes\User;
 use PDO;
@@ -626,4 +627,11 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->expectExceptionMessage('UNIQUE constraint failed: my_text_table.my_pk');
         $myTextTable2->save();
     }
+
+	public function testCallMethodPassingToPdoConnection()
+	{
+		$result = $this->ActiveRecord->prepare('SELECT * FROM user');
+		$this->assertInstanceOf(PdoStatementAdapter::class, $result);
+		$this->assertNotInstanceOf(ActiveRecord::class, $result);
+	}
 }
