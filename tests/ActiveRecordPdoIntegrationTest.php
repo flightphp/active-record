@@ -183,6 +183,32 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($user->address, $contact->address);
     }
 
+	public function testJoinIsClearedAfterCalledTwice()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+
+        $contact = new Contact(new PDO('sqlite:test.db'));
+        $contact->user_id = $user->id;
+        $contact->email = 'test@amail.com';
+        $contact->address = 'test address';
+        $contact->insert();
+
+        $user->select('*, c.email, c.address')->join('contact as c', 'c.user_id = user.id')->find();
+        // email and address will stored in user data array.
+        $this->assertEquals($user->id, $contact->user_id);
+        $this->assertEquals($user->email, $contact->email);
+        $this->assertEquals($user->address, $contact->address);
+
+		$user->select('*, c.email, c.address')->join('contact as c', 'c.user_id = user.id')->find();
+		// email and address will stored in user data array.
+        $this->assertEquals($user->id, $contact->user_id);
+        $this->assertEquals($user->email, $contact->email);
+        $this->assertEquals($user->address, $contact->address);
+    }
+
     public function testQuery()
     {
         $user = new class (new PDO('sqlite:test.db')) extends User {

@@ -317,6 +317,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         $this->params = [];
         $this->sqlExpressions = [];
+		$this->join = null;
         return $this;
     }
     /**
