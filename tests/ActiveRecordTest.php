@@ -13,6 +13,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     public function testMagicSet()
     {
         $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('generic');
         $record = new class ($pdo_mock) extends ActiveRecord {
             public function getDirty()
             {
@@ -28,6 +29,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     public function testExecutePdoError()
     {
         $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('generic');
         $pdo_mock->method('prepare')->willReturn(false);
         $pdo_mock->method('errorInfo')->willReturn(['HY000', 1, 'test']);
         $record = new class ($pdo_mock) extends ActiveRecord {
@@ -42,6 +44,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $statement_mock = $this->createStub(PDOStatement::class);
         $pdo_mock = $this->createStub(PDO::class);
         $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $pdo_mock->method('getAttribute')->willReturn('generic');
         $statement_mock->method('execute')->willReturn(false);
         $statement_mock->method('errorInfo')->willReturn(['HY000', 1, 'test_statement']);
         $record = new class ($pdo_mock) extends ActiveRecord {
@@ -54,6 +57,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     public function testUnsetSqlExpressions()
     {
         $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('generic');
         $record = new class ($pdo_mock) extends ActiveRecord {
         };
         $record->where = '1';
@@ -64,6 +68,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     public function testCustomData()
     {
         $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('generic');
         $record = new class ($pdo_mock) extends ActiveRecord {
         };
         $record->setCustomData('test', 'something');
@@ -73,6 +78,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
     public function testCustomDataUnset()
     {
         $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('generic');
         $record = new class ($pdo_mock) extends ActiveRecord {
         };
         $record->setCustomData('test', 'something');

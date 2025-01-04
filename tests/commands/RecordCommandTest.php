@@ -11,11 +11,16 @@ use PHPUnit\Framework\TestCase;
 
 class RecordCommandTest extends TestCase
 {
-    protected static $in = __DIR__ . '/input.test';
-    protected static $ou = __DIR__ . '/output.test';
+    protected static $in = '';
+    protected static $ou = '';
 
     public function setUp(): void
     {
+        static::$in = __DIR__ . '/input.test' . uniqid('', true);
+        static::$ou = __DIR__ . '/output.test' . uniqid('', true);
+        if (!file_exists(__DIR__ . '/records/')) {
+            mkdir(__DIR__ . '/records/');
+        }
         file_put_contents(static::$in, '', LOCK_EX);
         file_put_contents(static::$ou, '', LOCK_EX);
 
@@ -34,17 +39,14 @@ class RecordCommandTest extends TestCase
             unlink(static::$ou);
         }
 
-        if (file_exists(__DIR__ . '/records/UserRecord.php')) {
-            unlink(__DIR__ . '/records/UserRecord.php');
+        // find any files in records folder and delete them
+        foreach (glob(__DIR__ . '/records/*') as $file) {
+            unlink($file);
         }
 
-        if (file_exists(__DIR__ . '/records/StatusRecord.php')) {
-            unlink(__DIR__ . '/records/StatusRecord.php');
-        }
-
-        if (file_exists(__DIR__ . '/records/')) {
-            rmdir(__DIR__ . '/records/');
-        }
+        // if (file_exists(__DIR__ . '/records/')) {
+        //     rmdir(__DIR__ . '/records/');
+        // }
     }
 
     protected function newApp(string $in = '')
@@ -85,8 +87,7 @@ class RecordCommandTest extends TestCase
 
     public function testRecordAlreadyExists()
     {
-        mkdir(__DIR__ . '/records/');
-        file_put_contents(__DIR__ . '/records/UserRecord.php', '<?php class UserRecord {}');
+        file_put_contents(__DIR__ . '/records/CompanyRecord.php', '<?php class CompanyRecord {}');
         $app = $this->newApp();
         $app->add(new RecordCommand([
             'app_root' => 'tests/commands/',
@@ -95,15 +96,14 @@ class RecordCommandTest extends TestCase
                 'file_path' => ':memory:'
             ]
         ]));
-        $app->handle(['runway', 'make:record', 'users']);
+        $app->handle(['runway', 'make:record', 'company']);
 
-        $this->assertStringContainsString('UserRecord already exists.', file_get_contents(static::$ou));
+        $this->assertStringContainsString('CompanyRecord already exists.', file_get_contents(static::$ou));
     }
 
     public function testRecordAlreadyExistsMysql()
     {
-        mkdir(__DIR__ . '/records/');
-        file_put_contents(__DIR__ . '/records/UserRecord.php', '<?php class UserRecord {}');
+        file_put_contents(__DIR__ . '/records/TestRecord.php', '<?php class TestRecord {}');
         $commands = <<<TEXT
             mysql
             localhost
@@ -117,15 +117,14 @@ class RecordCommandTest extends TestCase
         $app->add(new RecordCommand([
             'app_root' => 'tests/commands/'
         ]));
-        $app->handle(['runway', 'make:record', 'users']);
+        $app->handle(['runway', 'make:record', 'test']);
 
-        $this->assertStringContainsString('UserRecord already exists.', file_get_contents(static::$ou));
+        $this->assertStringContainsString('TestRecord already exists.', file_get_contents(static::$ou));
     }
 
     public function testRecordAlreadyExistsPgsql()
     {
-        mkdir(__DIR__ . '/records/');
-        file_put_contents(__DIR__ . '/records/UserRecord.php', '<?php class UserRecord {}');
+        file_put_contents(__DIR__ . '/records/SomethingRecord.php', '<?php class SomethingRecord {}');
         $commands = <<<TEXT
             mysql
             localhost
@@ -139,9 +138,9 @@ class RecordCommandTest extends TestCase
         $app->add(new RecordCommand([
             'app_root' => 'tests/commands/'
         ]));
-        $app->handle(['runway', 'make:record', 'users']);
+        $app->handle(['runway', 'make:record', 'somethings']);
 
-        $this->assertStringContainsString('UserRecord already exists.', file_get_contents(static::$ou));
+        $this->assertStringContainsString('SomethingRecord already exists.', file_get_contents(static::$ou));
     }
 
     public function testSqliteCreation()
@@ -177,10 +176,10 @@ class RecordCommandTest extends TestCase
             }
         };
         $app->add($RecordCommand);
-        $app->handle(['runway', 'make:record', 'users']);
+        $app->handle(['runway', 'make:record', 'guys']);
 
-        $this->assertFileExists(__DIR__ . '/records/UserRecord.php');
-        $file_contents = file_get_contents(__DIR__ . '/records/UserRecord.php');
+        $this->assertFileExists(__DIR__ . '/records/GuyRecord.php');
+        $file_contents = file_get_contents(__DIR__ . '/records/GuyRecord.php');
         $this->assertStringContainsString('@property int $id', $file_contents);
         $this->assertStringContainsString('@property string $name', $file_contents);
         $this->assertStringContainsString('@property float $price', $file_contents);
@@ -220,10 +219,10 @@ class RecordCommandTest extends TestCase
             }
         };
         $app->add($RecordCommand);
-        $app->handle(['runway', 'make:record', 'users']);
+        $app->handle(['runway', 'make:record', 'yikes']);
 
-        $this->assertFileExists(__DIR__ . '/records/UserRecord.php');
-        $file_contents = file_get_contents(__DIR__ . '/records/UserRecord.php');
+        $this->assertFileExists(__DIR__ . '/records/YikeRecord.php');
+        $file_contents = file_get_contents(__DIR__ . '/records/YikeRecord.php');
         $this->assertStringContainsString('@property int $id', $file_contents);
         $this->assertStringContainsString('@property string $name', $file_contents);
         $this->assertStringContainsString('@property float $price', $file_contents);
@@ -263,10 +262,10 @@ class RecordCommandTest extends TestCase
             }
         };
         $app->add($RecordCommand);
-        $app->handle(['runway', 'make:record', 'users']);
+        $app->handle(['runway', 'make:record', 'boys']);
 
-        $this->assertFileExists(__DIR__ . '/records/UserRecord.php');
-        $file_contents = file_get_contents(__DIR__ . '/records/UserRecord.php');
+        $this->assertFileExists(__DIR__ . '/records/BoyRecord.php');
+        $file_contents = file_get_contents(__DIR__ . '/records/BoyRecord.php');
         $this->assertStringContainsString('@property int $id', $file_contents);
         $this->assertStringContainsString('@property string $name', $file_contents);
         $this->assertStringContainsString('@property float $price', $file_contents);
