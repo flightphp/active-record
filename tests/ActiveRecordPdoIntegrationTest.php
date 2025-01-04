@@ -57,6 +57,9 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->password = md5('demo');
         $user->insert();
         $this->assertGreaterThan(0, $user->id);
+        $sql = $user->getBuiltSql();
+        $this->assertStringContainsString('INSERT INTO "user" ("name","password")', $sql);
+        $this->assertStringContainsString('VALUES (:ph1,:ph2)', $sql);
     }
 
     public function testInsertNoChanges()
@@ -81,6 +84,9 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('demo1', $user->name);
         $this->assertNotEquals($original_password, $user->password);
         $this->assertEquals($original_id, $user->id);
+
+        $sql = $user->getBuiltSql();
+        $this->assertStringContainsString('UPDATE "user"  SET "name" = :ph3 , "password" = :ph4   WHERE "user"."id" = :ph5', $sql);
     }
 
     public function testUpdateNoChanges()
@@ -183,7 +189,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($user->address, $contact->address);
     }
 
-	public function testJoinIsClearedAfterCalledTwice()
+    public function testJoinIsClearedAfterCalledTwice()
     {
         $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'demo';
@@ -202,8 +208,8 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($user->email, $contact->email);
         $this->assertEquals($user->address, $contact->address);
 
-		$user->select('*, c.email, c.address')->join('contact as c', 'c.user_id = user.id')->find();
-		// email and address will stored in user data array.
+        $user->select('*, c.email, c.address')->join('contact as c', 'c.user_id = user.id')->find();
+        // email and address will stored in user data array.
         $this->assertEquals($user->id, $contact->user_id);
         $this->assertEquals($user->email, $contact->email);
         $this->assertEquals($user->address, $contact->address);
@@ -228,6 +234,8 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $contact->insert();
 
         $user->isNotNull('id')->eq('id', 1)->lt('id', 2)->gt('id', 0)->find();
+        $sql = $user->getBuiltSql();
+        $this->assertStringContainsString('SELECT "user".* FROM "user"   WHERE "user"."id" IS NOT NULL  AND "user"."id" = 1 AND "user"."id" < 2 AND "user"."id" > 0', $sql);
         $this->assertGreaterThan(0, $user->id);
         $this->assertSame([], $user->getDirty());
         $user->name = 'testname';
@@ -277,12 +285,15 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($uid, $new_user->eq('id', $uid)->find()->id);
         $this->assertTrue($contact->user->delete());
         $this->assertTrue($contact->delete());
+
+        $sql = $contact->getBuiltSql();
         $new_contact = new Contact(new PDO('sqlite:test.db'));
         $new_user = new User(new PDO('sqlite:test.db'));
         $this->assertInstanceOf(Contact::class, $new_contact->eq('id', $cid)->find());
         $this->assertEmpty($new_contact->id);
         $this->assertInstanceOf(User::class, $new_user->find($uid));
         $this->assertEmpty($new_user->id);
+        $this->assertStringContainsString('DELETE  FROM "contact"  WHERE "contact"."id" = :ph4', $sql);
     }
 
     public function testDeleteWithConditions()
@@ -654,10 +665,10 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $myTextTable2->save();
     }
 
-	public function testCallMethodPassingToPdoConnection()
-	{
-		$result = $this->ActiveRecord->prepare('SELECT * FROM user');
-		$this->assertInstanceOf(PdoStatementAdapter::class, $result);
-		$this->assertNotInstanceOf(ActiveRecord::class, $result);
-	}
+    public function testCallMethodPassingToPdoConnection()
+    {
+        $result = $this->ActiveRecord->prepare('SELECT * FROM user');
+        $this->assertInstanceOf(PdoStatementAdapter::class, $result);
+        $this->assertNotInstanceOf(ActiveRecord::class, $result);
+    }
 }

@@ -42,4 +42,14 @@ class PdoAdapter implements DatabaseInterface
     {
         return $this->pdo->lastInsertId();
     }
+
+    /**
+     * Returns a PDO connection to the database.
+     *
+     * @return PDO The PDO connection instance.
+     */
+    public function getConnection(): PDO
+    {
+        return $this->pdo;
+    }
 }

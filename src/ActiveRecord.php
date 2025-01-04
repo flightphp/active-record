@@ -7,6 +7,8 @@ namespace flight;
 use Exception;
 use flight\database\DatabaseInterface;
 use flight\database\DatabaseStatementInterface;
+use flight\database\mysqli\MysqliAdapter;
+use flight\database\pdo\PdoAdapter;
 use JsonSerializable;
 use mysqli;
 use PDO;
@@ -93,14 +95,19 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * Database connection
      *
-     * @var DatabaseInterface
+     * @var DatabaseInterface|null
      */
-    protected DatabaseInterface $databaseConnection;
+    protected ?DatabaseInterface $databaseConnection;
 
     /**
      * @var string  The table name in database.
      */
     protected string $table;
+
+    /**
+     * @var string The type of database engine
+     */
+    protected string $databaseEngineType;
 
     /**
      * @var string  The primary key of this ActiveRecord, only supports single primary key.
@@ -162,7 +169,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $this->transformAndPersistConnection($rawConnection);
         } elseif ($databaseConnection instanceof DatabaseInterface) {
             $this->databaseConnection = $databaseConnection;
+        } else {
+            $this->databaseConnection = null;
         }
+
+        $this->databaseEngineType = $this->getDatabaseEngine();
 
         if ($table) {
             $this->table = $table;
@@ -193,9 +204,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
                 'operator' => ActiveRecordData::SQL_PARTS[$name],
                 'target' => implode(', ', $args)
             ]);
-        } else if(method_exists($this->databaseConnection, $name) === true) {
-			return call_user_func_array([ $this->databaseConnection, $name ], $args);
-		}
+        } elseif (method_exists($this->databaseConnection, $name) === true) {
+            return call_user_func_array([ $this->databaseConnection, $name ], $args);
+        }
         return $this;
     }
 
@@ -317,7 +328,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         $this->params = [];
         $this->sqlExpressions = [];
-		$this->join = null;
+        $this->join = null;
         return $this;
     }
     /**
@@ -392,6 +403,23 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
 
     /**
+     * Returns the type of database engine. Can be one of: mysql, pgsql, sqlite, oci, sqlsrv, odbc, ibm, informix, firebird, 4D, generic.
+     *
+     * @return string
+     */
+    public function getDatabaseEngine(): string
+    {
+        if ($this->databaseConnection instanceof PdoAdapter || is_subclass_of($this->databaseConnection, PDO::class) === true) {
+            // returns value of mysql, pgsql, sqlite, oci, sqlsrv, odbc, ibm, informix, firebird, 4D, generic.
+            return $this->databaseConnection->getConnection()->getAttribute(PDO::ATTR_DRIVER_NAME);
+        } elseif ($this->databaseConnection instanceof MysqliAdapter) {
+            return 'mysql';
+        } else {
+            return 'generic';
+        }
+    }
+
+    /**
      * function to find one record and assign in to current object.
      * @param int|string $id If call this function using this param, will find record by using this id. If not set, just find the first record in database.
      * @return bool|ActiveRecord if find record, assign in to current object and return it, other wise return "false".
@@ -449,9 +477,14 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
 
         $value = $this->filterParam($this->dirty);
+
+        // escape column names from dirty data
+        $columnNames = array_keys($this->dirty);
+        $escapedColumnNames = array_map([$this, 'escapeIdentifier'], $columnNames);
+
         $this->insert = new Expressions([
-            'operator' => 'INSERT INTO ' . $this->table,
-            'target' => new WrapExpressions(['target' => array_keys($this->dirty)])
+            'operator' => 'INSERT INTO ' . $this->escapeIdentifier($this->table),
+            'target' => new WrapExpressions(['target' => $escapedColumnNames])
         ]);
         $this->values = new Expressions(['operator' => 'VALUES', 'target' => new WrapExpressions(['target' => $value])]);
 
@@ -622,9 +655,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected function buildSqlCallback(string $sql_statement, ActiveRecord $object): string
     {
         if ('select' === $sql_statement && null == $object->$sql_statement) {
-            $sql_statement = strtoupper($sql_statement) . ' ' . $object->table . '.*';
+            $sql_statement = strtoupper($sql_statement) . ' ' . $this->escapeIdentifier($object->table) . '.*';
         } elseif (('update' === $sql_statement || 'from' === $sql_statement) && null == $object->$sql_statement) {
-            $sql_statement = strtoupper($sql_statement) . ' ' . $object->table;
+            $sql_statement = strtoupper($sql_statement) . ' ' . $this->escapeIdentifier($object->table);
         } elseif ('delete' === $sql_statement) {
             $sql_statement = strtoupper($sql_statement) . ' ';
         } else {
@@ -723,7 +756,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         // skip adding the `table.` prefix if it's already there or a function is being supplied.
         $skip_table_prefix = (strpos($field, '.') !== false || strpos($field, '(') !== false);
         $expressions = new Expressions([
-            'source' => ('where' === $name && $skip_table_prefix === false ? $this->table . '.' : '') . $field,
+            'source' => ('where' === $name && $skip_table_prefix === false ? $this->escapeIdentifier($this->table) . '.' : '') . $this->escapeIdentifier($field),
             'operator' => $operator,
             'target' => (
                 is_array($value)
@@ -813,6 +846,28 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             if (method_exists($this, $event_name) && in_array($event_name, ActiveRecordData::EVENTS, true) === true) {
                 $this->{$event_name}(...$data_to_pass);
             }
+        }
+    }
+
+
+    /**
+     * Escapes a database identifier (e.g., table or column name) to prevent SQL injection.
+     *
+     * @param string $name The database identifier to be escaped.
+     * @return string The escaped database identifier.
+     */
+    public function escapeIdentifier(string $name)
+    {
+        switch ($this->databaseEngineType) {
+            case 'sqlite':
+            case 'pgsql':
+                return '"' . $name . '"';
+            case 'mysql':
+                return '`' . $name . '`';
+            case 'sqlsrv':
+                return '[' . $name . ']';
+            default:
+                return $name;
         }
     }
 
