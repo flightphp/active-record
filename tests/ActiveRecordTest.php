@@ -146,4 +146,15 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $result = $record->find()->getBuiltSql();
         $this->assertEquals('SELECT test_table.* FROM test_table  LEFT JOIN table1 ON table1.some_id = test_table.id LEFT JOIN table2 ON table2.some_id = table1.id       LIMIT 1  ', $result);
     }
+
+    public function testEscapeIdentifierSqlSrv()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+            public function getDatabaseEngine(): string
+            {
+                return 'sqlsrv';
+            }
+        };
+        $this->assertEquals('[test_table]', $record->escapeIdentifier('test_table'));
+    }
 }
