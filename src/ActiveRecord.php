@@ -568,11 +568,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      * helper function to query one record by sql and params.
      * @param string $sql The SQL to find record.
      * @param array $param The param will be bind to PDOStatement.
-     * @param ActiveRecord $obj The object, if find record in database, will assign the attributes in to this object.
+     * @param ActiveRecord|null $obj The object, if find record in database, will assign the attributes in to this object.
      * @param bool $single if set to true, will find record and fetch in current object, otherwise will find all records.
      * @return bool|ActiveRecord|array
      */
-    public function query(string $sql, array $param = [], ActiveRecord $obj = null, bool $single = false)
+    public function query(string $sql, array $param = [], ?ActiveRecord $obj = null, bool $single = false)
     {
         $called_class = get_called_class();
         $obj = $obj ?: new $called_class($this->databaseConnection);

@@ -12,6 +12,15 @@ class MysqliStatementAdapter implements DatabaseStatementInterface
 {
     private mysqli_stmt $statement;
 
+    /** @var array */
+    private $allResults = [];
+
+    /** @var int */
+    private $allResultsCount = 0;
+
+    /** @var int */
+    private $resultIndex = 0;
+
     /**
      * Construct
      *
@@ -46,8 +55,30 @@ class MysqliStatementAdapter implements DatabaseStatementInterface
     public function fetch(&$object)
     {
 
-        $raw_result = $this->statement->get_result();
-        $result = $raw_result->fetch_assoc();
+        // If there are no more results to fetch, return false.
+        if ($this->allResultsCount > 0 && $this->resultIndex >= $this->allResultsCount) {
+            return false;
+        }
+
+        // If it hasn't run the query just yet, run it and store all results in the object.
+        if ($this->resultIndex === 0) {
+            $raw_result = $this->statement->get_result();
+            if ($raw_result === false) {
+                throw new Exception($this->getErrorList()[0]['error']);
+            }
+
+            while ($row = $raw_result->fetch_assoc()) {
+                $this->allResults[] = $row;
+                ++$this->allResultsCount;
+            }
+        }
+
+        // No results to fetch
+        if ($this->allResultsCount === 0) {
+            return false;
+        }
+
+        $result = $this->allResults[$this->resultIndex++];
         if ($result) {
             foreach ($result as $key => $value) {
                 $object->{$key} = $value;

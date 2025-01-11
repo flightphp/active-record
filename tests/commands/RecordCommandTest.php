@@ -18,9 +18,6 @@ class RecordCommandTest extends TestCase
     {
         static::$in = __DIR__ . '/input.test' . uniqid('', true);
         static::$ou = __DIR__ . '/output.test' . uniqid('', true);
-        if (!file_exists(__DIR__ . '/records/')) {
-            mkdir(__DIR__ . '/records/');
-        }
         file_put_contents(static::$in, '', LOCK_EX);
         file_put_contents(static::$ou, '', LOCK_EX);
 
@@ -44,9 +41,9 @@ class RecordCommandTest extends TestCase
             unlink($file);
         }
 
-        // if (file_exists(__DIR__ . '/records/')) {
-        //     rmdir(__DIR__ . '/records/');
-        // }
+        if (file_exists(__DIR__ . '/records/')) {
+            rmdir(__DIR__ . '/records/');
+        }
     }
 
     protected function newApp(string $in = '')
@@ -87,6 +84,7 @@ class RecordCommandTest extends TestCase
 
     public function testRecordAlreadyExists()
     {
+        mkdir(__DIR__ . '/records/');
         file_put_contents(__DIR__ . '/records/CompanyRecord.php', '<?php class CompanyRecord {}');
         $app = $this->newApp();
         $app->add(new RecordCommand([
@@ -103,6 +101,7 @@ class RecordCommandTest extends TestCase
 
     public function testRecordAlreadyExistsMysql()
     {
+        mkdir(__DIR__ . '/records/');
         file_put_contents(__DIR__ . '/records/TestRecord.php', '<?php class TestRecord {}');
         $commands = <<<TEXT
             mysql
@@ -124,6 +123,7 @@ class RecordCommandTest extends TestCase
 
     public function testRecordAlreadyExistsPgsql()
     {
+        mkdir(__DIR__ . '/records/');
         file_put_contents(__DIR__ . '/records/SomethingRecord.php', '<?php class SomethingRecord {}');
         $commands = <<<TEXT
             mysql
