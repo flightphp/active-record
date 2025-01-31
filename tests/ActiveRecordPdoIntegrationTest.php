@@ -86,7 +86,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($original_id, $user->id);
 
         $sql = $user->getBuiltSql();
-        $this->assertStringContainsString('UPDATE "user"  SET "name" = :ph3 , "password" = :ph4   WHERE "user"."id" = :ph5', $sql);
+        $this->assertStringContainsString('UPDATE "user" SET "name" = :ph3 , "password" = :ph4 WHERE "user"."id" = :ph5', $sql);
     }
 
     public function testUpdateNoChanges()
@@ -235,7 +235,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
         $user->isNotNull('id')->eq('id', 1)->lt('id', 2)->gt('id', 0)->find();
         $sql = $user->getBuiltSql();
-        $this->assertStringContainsString('SELECT "user".* FROM "user"   WHERE "user"."id" IS NOT NULL  AND "user"."id" = 1 AND "user"."id" < 2 AND "user"."id" > 0', $sql);
+        $this->assertStringContainsString('SELECT "user".* FROM "user" WHERE "user"."id" IS NOT NULL AND "user"."id" = 1 AND "user"."id" < 2 AND "user"."id" > 0', $sql);
         $this->assertGreaterThan(0, $user->id);
         $this->assertSame([], $user->getDirty());
         $user->name = 'testname';
@@ -245,7 +245,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         unset($user->name);
         $this->assertSame([], $user->getDirty());
         $user->isNotNull('id')->eq('id', 'aaa"')->wrap()->lt('id', 2)->gt('id', 0)->wrap('OR')->find();
-        $this->assertGreaterThan(0, $user->id);
+        $this->assertEmpty($user->id);
         $user->isNotNull('id')->between('id', [0, 2])->find();
         $this->assertGreaterThan(0, $user->id);
     }
@@ -260,7 +260,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->password = md5('demo1');
         $user->insert();
 
-        $users = $user->isNotNull('id')->wrap('OR')->in('name', [ 'demo', 'demo1' ])->wrap('AND')->lt('id', 3)->gt('id', 0)->wrap('OR')->findAll();
+        $users = $user->isNotNull('id')->wrap()->in('name', [ 'demo', 'demo1' ])->wrap('OR')->lt('id', 3)->gt('id', 0)->findAll();
         $this->assertGreaterThan(0, $users[0]->id);
         $this->assertGreaterThan(0, $users[1]->id);
     }
@@ -293,7 +293,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEmpty($new_contact->id);
         $this->assertInstanceOf(User::class, $new_user->find($uid));
         $this->assertEmpty($new_user->id);
-        $this->assertStringContainsString('DELETE  FROM "contact"  WHERE "contact"."id" = :ph4', $sql);
+        $this->assertStringContainsString('DELETE FROM "contact" WHERE "contact"."id" = :ph4', $sql);
     }
 
     public function testDeleteWithConditions()
@@ -670,5 +670,38 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $result = $this->ActiveRecord->prepare('SELECT * FROM user');
         $this->assertInstanceOf(PdoStatementAdapter::class, $result);
         $this->assertNotInstanceOf(ActiveRecord::class, $result);
+    }
+
+    public function testWrapMultipleOrStatements()
+    {
+        $record = new User(new PDO('sqlite:test.db'));
+        $record
+            ->notNull('name')
+            ->startWrap()
+            ->eq('name', 'John')
+            ->eq('id', 1)
+            ->gte('password', '123')
+            ->endWrap('OR')
+            ->eq('id', 2)
+            ->find();
+        $sql = $record->getBuiltSql();
+        $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" IS NOT NULL AND ("user"."name" = :ph1 OR "user"."id" = 1 OR "user"."password" >= :ph2) AND "user"."id" = 2 LIMIT 1', $sql);
+    }
+
+    public function testWrapWithComplexLogic()
+    {
+        $record = new User(new PDO('sqlite:test.db'));
+        $record
+            ->startWrap()
+            ->eq('name', 'John')
+            ->in('id', [ 1,5,9 ])
+            ->eq('id', 1)
+            ->endWrap('OR')
+            ->notNull('name')
+            ->between('id', [ 1, 2 ])
+            ->join('contact', '"contact"."user_id" = "user"."id"')
+            ->find();
+        $sql = $record->getBuiltSql();
+        $this->assertEquals('SELECT "user".* FROM "user" LEFT JOIN contact ON "contact"."user_id" = "user"."id" WHERE ("user"."name" = :ph1 OR "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = 1) AND "user"."name" IS NOT NULL AND "user"."id" BETWEEN :ph5 AND :ph6 LIMIT 1', $sql);
     }
 }

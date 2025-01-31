@@ -71,9 +71,14 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     public const HAS_ONE = 'has_one';
 
     /**
-     * @var array Stored the SQL Expressions of the SQL.
+     * @var array Store the SQL expressions inside wrapped (parentheses).
      */
-    protected array $expressions = [];
+    protected array $wrapExpressions = [];
+
+    /**
+     * @var boolean if a statement is being wrapped in parentheses
+     */
+    protected bool $wrap = false;
 
     /**
      * @var array Stored the Expressions of the SQL.
@@ -83,7 +88,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * @var string SQL that is built to be used by execute()
      */
-    protected string $built_sql = '';
+    protected string $builtSql = '';
 
     /**
      * Captures all the joins that are made
@@ -196,6 +201,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $operator = ActiveRecordData::OPERATORS[$name];
             $value = isset($args[1]) ? $args[1] : null;
             $last_arg = end($args);
+
+            // If the last arg is "OR" make this an OR condition
+            // e.g. $this->eq('name', 'John', 'or')->eq('age', 25);
             $and_or_or = is_string($last_arg) && strtolower($last_arg) === 'or' ? 'OR' : 'AND';
 
             $this->addCondition($field, $operator, $value, $and_or_or);
@@ -648,39 +656,47 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
     /**
      * helper function to build SQL with sql parts.
-     * @param string $sql_statement The SQL part will be build.
+     * @param string $sqlStatement The SQL part will be build.
      * @param ActiveRecord $o The reference to $this
      * @return string
      */
-    protected function buildSqlCallback(string $sql_statement, ActiveRecord $object): string
+    protected function buildSqlCallback(string $sqlStatement, ActiveRecord $object): string
     {
-        if ('select' === $sql_statement && null == $object->$sql_statement) {
-            $sql_statement = strtoupper($sql_statement) . ' ' . $this->escapeIdentifier($object->table) . '.*';
-        } elseif (('update' === $sql_statement || 'from' === $sql_statement) && null == $object->$sql_statement) {
-            $sql_statement = strtoupper($sql_statement) . ' ' . $this->escapeIdentifier($object->table);
-        } elseif ('delete' === $sql_statement) {
-            $sql_statement = strtoupper($sql_statement) . ' ';
+        // First add the SELECT table.*
+        if ('select' === $sqlStatement && null == $object->$sqlStatement) {
+            $sqlStatement = strtoupper($sqlStatement) . ' ' . $this->escapeIdentifier($object->table) . '.*';
+        } elseif (('update' === $sqlStatement || 'from' === $sqlStatement) && null == $object->$sqlStatement) {
+            $sqlStatement = strtoupper($sqlStatement) . ' ' . $this->escapeIdentifier($object->table);
+        } elseif ('delete' === $sqlStatement) {
+            $sqlStatement = strtoupper($sqlStatement);
         } else {
-            $sql_statement = (null !== $object->$sql_statement) ? $object->$sql_statement . ' ' : '';
+            $sqlStatement = (null !== $object->$sqlStatement) ? (string) $object->$sqlStatement : '';
         }
 
-        return $sql_statement;
+        return $sqlStatement;
     }
 
     /**
      * helper function to build SQL with sql parts.
-     * @param array $sql_statements The SQL part will be build.
+     * @param array $sqlStatements The SQL part will be build.
      * @return string
      */
-    protected function buildSql(array $sql_statements = []): string
+    protected function buildSql(array $sqlStatements = []): string
     {
-        foreach ($sql_statements as &$sql) {
-            $sql = $this->buildSqlCallback($sql, $this);
+        $finalSql = [];
+        foreach ($sqlStatements as $sql) {
+            $statement = $this->buildSqlCallback($sql, $this);
+            if ($statement !== '') {
+                $finalSql[] = $statement;
+            }
         }
         //this code to debug info.
-        //echo 'SQL: ', implode(' ', $sql_statements), "\n", "PARAMS: ", implode(', ', $this->params), "\n";
-        $this->built_sql = implode(' ', $sql_statements);
-        return $this->built_sql;
+        //echo 'SQL: ', implode(' ', $sqlStatements), "\n", "PARAMS: ", implode(', ', $this->params), "\n";
+        $this->builtSql = implode(' ', $finalSql);
+
+        // get rid of multiple spaces in the query for prettiness
+        $this->builtSql = preg_replace('/\s+/', ' ', $this->builtSql);
+        return $this->builtSql;
     }
 
     /**
@@ -690,29 +706,45 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function getBuiltSql(): string
     {
-        return $this->built_sql;
+        return $this->builtSql;
     }
+
+    public function startWrap(): self
+    {
+        $this->wrap = true;
+        return $this;
+    }
+
+    /**
+     * Alias to encWrap
+     *
+     * @deprecated 0.6.0
+     * @param string|null $op If give this param will build one WrapExpressions include the stored expressions add into WHERE. Otherwise will stored the expressions into array.
+     * @return self
+     */
+    public function wrap(?string $op = null): self
+    {
+        return $op === null ? $this->startWrap() : $this->endWrap($op);
+    }
+
     /**
      * make wrap when build the SQL expressions of WHERE.
      * @param string $op If give this param will build one WrapExpressions include the stored expressions add into WHERE. Otherwise will stored the expressions into array.
      * @return ActiveRecord
      */
-    public function wrap(?string $op = null)
+    public function endWrap(string $op): self
     {
-        if ($op !== null) {
-            $this->wrap = false;
-            if (is_array($this->expressions) && count($this->expressions) > 0) {
-                $this->addConditionGroup(new WrapExpressions([
-                    'delimiter' => ' ',
-                    'target' => $this->expressions
-                ]), 'or' === strtolower($op) ? 'OR' : 'AND');
-            }
-            $this->expressions = [];
-        } else {
-            $this->wrap = true;
+        $this->wrap = false;
+        if (is_array($this->wrapExpressions) === true && count($this->wrapExpressions) > 0) {
+            $this->addCondition(new WrapExpressions([
+                'delimiter' => ('or' === strtolower($op) ? ' OR ' : ' AND '),
+                'target' => $this->wrapExpressions
+            ]), null, null);
         }
+        $this->wrapExpressions = [];
         return $this;
     }
+
 
     /**
      * helper function to build place holder when making SQL expressions.
@@ -738,25 +770,31 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * helper function to add condition into WHERE.
      * create the SQL Expressions.
-     * @param string $field The field name, the source of Expressions
-     * @param string $operator
+     * @param string|Expressions $field The field name, the source of Expressions
+     * @param ?string $operator
      * @param mixed $value the target of the Expressions
      * @param string $delimiter the operator to concat this Expressions into WHERE or SET statement.
      * @param string $name The Expression will contact to.
      */
-    public function addCondition(string $field, string $operator, $value, string $delimiter = 'AND', string $name = 'where')
+    public function addCondition($field, ?string $operator, $value, string $delimiter = 'AND', string $name = 'where')
     {
         // This will catch unique conditions such as IS NULL, IS NOT NULL, etc
         // You only need to filter by a param if there's a param to really filter by
-        if (stripos($operator, 'NULL') === false) {
+        // A true null value is passed in from a endWrap() method to skip the param.
+        if ($operator !== null && stripos((string) $operator, 'NULL') === false) {
             $value = $this->filterParam($value);
+        }
+
+        // This is used for wrapped expressions so extra statements aren't printed out.
+        if ($operator === null) {
+            $operator = '';
         }
         $name = strtolower($name);
 
         // skip adding the `table.` prefix if it's already there or a function is being supplied.
-        $skip_table_prefix = (strpos($field, '.') !== false || strpos($field, '(') !== false);
+        $skipTablePrefix = $field instanceof WrapExpressions || is_string($field) === true && (strpos($field, '.') !== false || strpos($field, '(') !== false);
         $expressions = new Expressions([
-            'source' => ('where' === $name && $skip_table_prefix === false ? $this->escapeIdentifier($this->table) . '.' : '') . $this->escapeIdentifier($field),
+            'source' => ('where' === $name && $skipTablePrefix === false ? $this->escapeIdentifier($this->table) . '.' : '') . (is_string($field) === true ? $this->escapeIdentifier($field) : $field),
             'operator' => $operator,
             'target' => (
                 is_array($value)
@@ -769,10 +807,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             )
         ]);
         if ($expressions) {
-            if (!$this->wrap) {
+            if ($this->wrap === false) {
                 $this->addConditionGroup($expressions, $delimiter, $name);
             } else {
-                $this->addExpression($expressions, $delimiter);
+                // This method is only for wrapping conditions in parentheses
+                $this->addExpression($expressions);
             }
         }
     }
@@ -805,12 +844,13 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      * @param Expressions $exp The expression will be stored.
      * @param string $delimiter The operator to concat this Expressions into WHERE statement.
      */
-    protected function addExpression(Expressions $expressions, string $delimiter)
+    protected function addExpression(Expressions $expressions)
     {
-        if (!is_array($this->expressions) || count($this->expressions) == 0) {
-            $this->expressions = [ $expressions ];
+        $wrapExpressions =& $this->wrapExpressions;
+        if (is_array($wrapExpressions) === false || count($wrapExpressions) === 0) {
+            $wrapExpressions = [ $expressions ];
         } else {
-            $this->expressions[] = new Expressions(['operator' => $delimiter, 'target' => $expressions]);
+            $wrapExpressions[] = new Expressions([ 'operator' => '', 'target' => $expressions ]);
         }
     }
 
@@ -823,9 +863,16 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected function addConditionGroup(Expressions $expressions, string $operator, string $name = 'where')
     {
         if (!$this->{$name}) {
-            $this->{$name} = new Expressions(['operator' => strtoupper($name) , 'target' => $expressions]);
+            $this->{$name} = new Expressions([
+                'operator' => strtoupper($name),
+                'target' => $expressions
+            ]);
         } else {
-            $this->{$name}->target = new Expressions(['source' => $this->$name->target, 'operator' => $operator, 'target' => $expressions]);
+            $this->{$name}->target = new Expressions([
+                'source' => $this->$name->target,
+                'operator' => $operator,
+                'target' => $expressions
+            ]);
         }
     }
 

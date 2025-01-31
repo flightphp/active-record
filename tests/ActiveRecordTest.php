@@ -10,6 +10,12 @@ use stdClass;
 
 class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 {
+    protected function createEmptyRecord()
+    {
+        return new class (null, 'test_table') extends ActiveRecord {
+        };
+    }
+
     public function testMagicSet()
     {
         $pdo_mock = $this->createStub(PDO::class);
@@ -117,8 +123,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
     public function testCopyFrom()
     {
-        $record = new class (null, 'test_table') extends ActiveRecord {
-        };
+        $record = $this->createEmptyRecord();
         $record->copyFrom(['name' => 'John']);
         $this->assertEquals('John', $record->name);
         $this->assertEquals(['name' => 'John'], $record->getData());
@@ -126,8 +131,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
     public function testIsset()
     {
-        $record = new class (null, 'test_table') extends ActiveRecord {
-        };
+        $record = $this->createEmptyRecord();
         $record->name = 'John';
         $this->assertTrue(isset($record->name));
         $this->assertFalse(isset($record->email));
@@ -144,7 +148,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $record->join('table1', 'table1.some_id = test_table.id');
         $record->join('table2', 'table2.some_id = table1.id');
         $result = $record->find()->getBuiltSql();
-        $this->assertEquals('SELECT test_table.* FROM test_table  LEFT JOIN table1 ON table1.some_id = test_table.id LEFT JOIN table2 ON table2.some_id = table1.id       LIMIT 1  ', $result);
+        $this->assertEquals('SELECT test_table.* FROM test_table LEFT JOIN table1 ON table1.some_id = test_table.id LEFT JOIN table2 ON table2.some_id = table1.id LIMIT 1', $result);
     }
 
     public function testEscapeIdentifierSqlSrv()

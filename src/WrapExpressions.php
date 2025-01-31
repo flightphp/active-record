@@ -16,6 +16,11 @@ class WrapExpressions extends Expressions
 
     public function __toString()
     {
-        return $this->start . implode(($this->delimiter ? $this->delimiter : ','), $this->target) . $this->end;
+        if (is_array($this->target) === true) {
+            $this->target = array_map(function ($target) {
+                return $target instanceof Expressions ? $target->__toString() : $target;
+            }, $this->target);
+        }
+        return $this->start . implode($this->delimiter, $this->target) . $this->end;
     }
 }
