@@ -704,4 +704,16 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $sql = $record->getBuiltSql();
         $this->assertEquals('SELECT "user".* FROM "user" LEFT JOIN contact ON "contact"."user_id" = "user"."id" WHERE ("user"."name" = :ph1 OR "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = 1) AND "user"."name" IS NOT NULL AND "user"."id" BETWEEN :ph5 AND :ph6 LIMIT 1', $sql);
     }
+
+    public function testOrAsFinalParameter()
+    {
+        $record = new User(new PDO('sqlite:test.db'));
+        $record
+            ->eq('name', 'John')
+            ->in('id', [ 1,5,9 ])
+            ->eq('id', 1, 'or')
+            ->find();
+        $sql = $record->getBuiltSql();
+        $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = 1 LIMIT 1', $sql);
+    }
 }
