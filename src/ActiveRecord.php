@@ -529,7 +529,19 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
         $this->execute($this->buildSql(['insert', 'values']), $this->params);
 
-        $this->{$this->primaryKey} = $intentionallyAssignedPrimaryKey ?: $this->databaseConnection->lastInsertId();
+        $lastInsertId = $intentionallyAssignedPrimaryKey ?: $this->databaseConnection->lastInsertId();
+
+        // Cast to int if the primary key property is typed as int,
+        // since lastInsertId() returns a string which fails under strict_types.
+        $classRef = new \ReflectionClass($this);
+        if ($classRef->hasProperty($this->primaryKey)) {
+            $type = $classRef->getProperty($this->primaryKey)->getType();
+            if ($type instanceof \ReflectionNamedType && $type->getName() === 'int') {
+                $lastInsertId = (int) $lastInsertId;
+            }
+        }
+
+        $this->{$this->primaryKey} = $lastInsertId;
 
         $this->processEvent(['afterInsert', 'afterSave'], [$this]);
 
