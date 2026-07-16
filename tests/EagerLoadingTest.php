@@ -23,6 +23,7 @@ class EagerLoadingTest extends TestCase
     {
         require_once __DIR__ . '/classes/User.php';
         require_once __DIR__ . '/classes/Contact.php';
+        require_once __DIR__ . '/classes/QueryCountingAdapter.php';
     }
 
     public function setUp(): void
