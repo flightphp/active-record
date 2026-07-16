@@ -125,4 +125,24 @@ class TypedPropertyTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue($users[0]->isHydrated(), 'findAll() results should be hydrated');
         $this->assertTrue($users[1]->isHydrated());
     }
+
+    public function testSyncDirtySkipsPropertiesAlreadyInDirty(): void
+    {
+        $user = new TypedUser($this->pdo);
+        $user->name = 'prefilled';
+        $user->password = 'hash';
+
+        $sync = new \ReflectionMethod(\flight\ActiveRecord::class, 'syncDirtyFromProperties');
+        $sync->setAccessible(true);
+        $sync->invoke($user, false);
+
+        $dirtyProp = new \ReflectionProperty(\flight\ActiveRecord::class, 'dirty');
+        $dirtyProp->setAccessible(true);
+        $dirty = $dirtyProp->getValue($user);
+        $this->assertArrayHasKey('name', $dirty);
+
+        // Second sync should hit the "already in dirty" continue branch
+        $sync->invoke($user, false);
+        $this->assertSame('prefilled', $dirtyProp->getValue($user)['name']);
+    }
 }

@@ -714,7 +714,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
             ->join('contact', '"contact"."user_id" = "user"."id"')
             ->find();
         $sql = $record->getBuiltSql();
-        $this->assertEquals('SELECT "user".* FROM "user" LEFT JOIN contact ON "contact"."user_id" = "user"."id" WHERE ("user"."name" = :ph1 OR "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = :ph5) AND "user"."name" IS NOT NULL AND "user"."id" BETWEEN :ph6 AND :ph7 LIMIT 1', $sql);
+        $this->assertEquals('SELECT "user".* FROM "user" LEFT JOIN "contact" ON "contact"."user_id" = "user"."id" WHERE ("user"."name" = :ph1 OR "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = :ph5) AND "user"."name" IS NOT NULL AND "user"."id" BETWEEN :ph6 AND :ph7 LIMIT 1', $sql);
     }
 
     public function testOrAsFinalParameter()

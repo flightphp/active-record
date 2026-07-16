@@ -16,6 +16,15 @@ class TypedUser extends ActiveRecord
     public string $password;
     public ?string $created_dt = null;
 
+    /**
+     * Intentionally left unset in many tests so sync helpers skip uninitialized props.
+     * @var string
+     */
+    public string $unused_optional;
+
+    /** Skipped by sync helpers; present so the static-property branch is covered */
+    public static string $marker = 'typed-user';
+
     public function __construct($databaseConnection = null, array $config = [])
     {
         parent::__construct($databaseConnection, 'user', $config);

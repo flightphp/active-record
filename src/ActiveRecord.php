@@ -27,6 +27,14 @@ use PDO;
  * Using magic function to implement more smarty functions.<br />
  * Can using chain method calls, to build concise and compactness program.<br />
  *
+ * Security notes:
+ * - Condition values via eq/like/in/etc. are bound as parameters (safe for untrusted values).
+ * - Table/column identifiers passed through escapeIdentifier() are quoted and delimiter-escaped.
+ * - where(), having(), select(), order()/orderBy(), group()/groupBy(), and join() ON clauses
+ *   accept raw SQL fragments. Do not pass untrusted input into those methods.
+ *   Prefer eq()/in()/… for filters, and orderByColumn() when the sort column may be user-supplied.
+ * - copyFrom()/dirty() treat array keys as column names; only pass trusted keys (or a fixed allowlist).
+ *
  * @method self equal(string $field, mixed $value, string $operator = 'AND') Equal operator
  * @method self eq(string $field, mixed $value, string $operator = 'AND') Equal operator
  * @method self notEqual(string $field, mixed $value, string $operator = 'AND') Not Equal operator
@@ -50,16 +58,16 @@ use PDO;
  * @method self isNotNull(string $field, string $operator = 'AND') Is Not Null
  * @method self notNull(string $field, string $operator = 'AND') Not Null
  *
- * @method self select(string $field, [...$field2]) Select
+ * @method self select(string $field, [...$field2]) Select columns/expressions (raw SQL fragments — do not pass untrusted input)
  * @method self from(string $table) From
  * @method self join(string $table_to_join, string $join_condition) Join another table in the database
  * @method self set(string $field, mixed $value, [...$field2]) Set
- * @method self where(string $sql_conditions) Where
- * @method self group(string $field, [...$field2]) Group By
- * @method self groupBy(string $field, [...$field2]) Group By
- * @method self having(string $sql_conditions) Having
- * @method self order(string $field, [...$field2]) Order By
- * @method self orderBy(string $field, [...$field2]) Order By
+ * @method self where(string $sql_conditions) Raw WHERE SQL — do not interpolate untrusted input; use eq()/in()/etc. instead
+ * @method self group(string $field, [...$field2]) Group By (raw SQL fragments — do not pass untrusted input)
+ * @method self groupBy(string $field, [...$field2]) Group By (raw SQL fragments — do not pass untrusted input)
+ * @method self having(string $sql_conditions) Raw HAVING SQL — do not interpolate untrusted input
+ * @method self order(string $field, [...$field2]) Order By (raw SQL fragments — prefer orderByColumn() for untrusted sort fields)
+ * @method self orderBy(string $field, [...$field2]) Order By (raw SQL fragments — prefer orderByColumn() for untrusted sort fields)
  * @method self limit(int $limit) Limit
  * @method self offset(int $offset) Offset
  * @method self top(int $top) Top
@@ -215,6 +223,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
             $this->addCondition($field, $operator, $value, $and_or_or);
         } elseif (in_array($name, array_keys(ActiveRecordData::SQL_PARTS))) {
+            $args = $this->normalizeSqlPartArgs($name, $args);
             $this->{$name} = new Expressions([
                 'operator' => ActiveRecordData::SQL_PARTS[$name],
                 'target' => implode(', ', $args)
@@ -1145,8 +1154,14 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * helper function to add condition into JOIN.
      * create the SQL Expressions.
-     * @param string $table The join table name
-     * @param string $on The condition of ON
+     *
+     * Simple table names and `table alias` / `table AS alias` forms are identifier-escaped.
+     * Complex expressions (subqueries, already-quoted SQL) are left unchanged.
+     *
+     * The ON clause is raw SQL — do not interpolate untrusted input into $on.
+     *
+     * @param string $table The join table name (or "table alias" / "table AS alias")
+     * @param string $on The condition of ON (raw SQL fragment)
      * @param string $type The join type, like "LEFT", "INNER", "OUTER", "RIGHT"
      */
     public function join(string $table, string $on, string $type = 'LEFT')
@@ -1156,13 +1171,37 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             'operator' => $type . ' JOIN',
             'target' => new Expressions(
                 [
-                    'source' => $table,
+                    'source' => $this->escapeJoinTable($table),
                     'operator' => 'ON',
                     'target' => $on
                 ]
             )
         ]);
         return $this;
+    }
+
+    /**
+     * ORDER BY a single column with ASC/DESC. Safe when the column name may be untrusted
+     * (e.g. from a request), unlike order()/orderBy() which accept raw SQL fragments.
+     *
+     * Only simple identifiers or table.column paths are allowed.
+     *
+     * @param string $column Column name or table.column
+     * @param string $direction ASC or DESC (case-insensitive)
+     * @return self
+     * @throws Exception If the column or direction is invalid
+     */
+    public function orderByColumn(string $column, string $direction = 'ASC'): self
+    {
+        $direction = strtoupper(trim($direction));
+        if ($direction !== 'ASC' && $direction !== 'DESC') {
+            throw new Exception('Invalid ORDER BY direction; use ASC or DESC');
+        }
+        if ($this->isSafeIdentifierPath($column) === false) {
+            throw new Exception('Invalid ORDER BY column identifier');
+        }
+
+        return $this->order($this->escapeIdentifierPath($column) . ' ' . $direction);
     }
 
     /**
@@ -1226,22 +1265,145 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * Escapes a database identifier (e.g., table or column name) to prevent SQL injection.
      *
+     * Delimiter characters inside the name are escaped per engine rules so a value such as
+     * id" OR 1=1 -- cannot break out of the quoted identifier.
+     *
      * @param string $name The database identifier to be escaped.
      * @return string The escaped database identifier.
      */
     public function escapeIdentifier(string $name)
     {
+        // Identifiers must not contain NUL bytes
+        $name = str_replace("\0", '', $name);
+
         switch ($this->databaseEngineType) {
             case 'sqlite':
             case 'pgsql':
-                return '"' . $name . '"';
+                return '"' . str_replace('"', '""', $name) . '"';
             case 'mysql':
-                return '`' . $name . '`';
+                return '`' . str_replace('`', '``', $name) . '`';
             case 'sqlsrv':
-                return '[' . $name . ']';
+                return '[' . str_replace(']', ']]', $name) . ']';
             default:
                 return $name;
         }
+    }
+
+    /**
+     * Escapes a dotted identifier path (e.g. table.column) by quoting each segment.
+     *
+     * @param string $path Identifier or table.column path (must already be a safe path)
+     * @return string
+     */
+    protected function escapeIdentifierPath(string $path): string
+    {
+        $parts = explode('.', $path);
+        $escaped = [];
+        foreach ($parts as $part) {
+            $escaped[] = $this->escapeIdentifier($part);
+        }
+        return implode('.', $escaped);
+    }
+
+    /**
+     * Whether a string is a safe identifier or table.column path (no SQL metacharacters).
+     *
+     * @param string $path
+     * @return bool
+     */
+    protected function isSafeIdentifierPath(string $path): bool
+    {
+        return (bool) preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/', $path);
+    }
+
+    /**
+     * Escape join table when it is a simple table / alias form; leave complex SQL unchanged.
+     *
+     * @param string $table
+     * @return string
+     */
+    protected function escapeJoinTable(string $table): string
+    {
+        $table = trim($table);
+
+        // table AS alias
+        if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)\s+[Aa][Ss]\s+([A-Za-z_][A-Za-z0-9_]*)$/', $table, $matches) === 1) {
+            return $this->escapeIdentifier($matches[1]) . ' AS ' . $this->escapeIdentifier($matches[2]);
+        }
+
+        // table alias (implicit AS)
+        if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)$/', $table, $matches) === 1) {
+            return $this->escapeIdentifier($matches[1]) . ' ' . $this->escapeIdentifier($matches[2]);
+        }
+
+        // schema.table
+        if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)$/', $table, $matches) === 1) {
+            return $this->escapeIdentifier($matches[1]) . '.' . $this->escapeIdentifier($matches[2]);
+        }
+
+        // simple table name
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $table) === 1) {
+            return $this->escapeIdentifier($table);
+        }
+
+        // Subquery, already-quoted SQL, or other complex expression — leave as-is for BC
+        return $table;
+    }
+
+    /**
+     * Normalize raw SQL part arguments without breaking complex developer SQL.
+     *
+     * - limit/offset/top: coerce pure integers
+     * - select/group/order: quote args that are clearly simple identifiers / order expressions
+     * - Complex expressions (functions, commas inside one arg, etc.) are left unchanged
+     *
+     * @param string $part SQL part name after "By" stripping (select, order, group, limit, …)
+     * @param array $args
+     * @return array
+     */
+    protected function normalizeSqlPartArgs(string $part, array $args): array
+    {
+        if (in_array($part, ['limit', 'offset', 'top'], true) === true) {
+            return array_map(function ($arg) {
+                if (is_int($arg) === true) {
+                    return $arg;
+                }
+                if (is_string($arg) === true && preg_match('/^-?\d+$/', $arg) === 1) {
+                    return (int) $arg;
+                }
+                return $arg;
+            }, $args);
+        }
+
+        if (in_array($part, ['select', 'group', 'order', 'from'], true) === true) {
+            return array_map(function ($arg) use ($part) {
+                if (is_string($arg) === false) {
+                    return $arg;
+                }
+
+                $trimmed = trim($arg);
+
+                // order/orderBy: "column", "column ASC|DESC", "table.column", "table.column ASC|DESC"
+                if ($part === 'order') {
+                    if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)\s+(ASC|DESC)$/i', $trimmed, $matches) === 1) {
+                        return $this->escapeIdentifierPath($matches[1]) . ' ' . strtoupper($matches[2]);
+                    }
+                    if ($this->isSafeIdentifierPath($trimmed) === true) {
+                        return $this->escapeIdentifierPath($trimmed);
+                    }
+                    return $arg;
+                }
+
+                // select / group / from: only pure identifier paths (not *, functions, aliases)
+                if ($this->isSafeIdentifierPath($trimmed) === true) {
+                    return $this->escapeIdentifierPath($trimmed);
+                }
+
+                return $arg;
+            }, $args);
+        }
+
+        return $args;
     }
 
     /**
