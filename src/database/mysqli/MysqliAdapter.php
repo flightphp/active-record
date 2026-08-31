@@ -46,6 +46,30 @@ class MysqliAdapter implements DatabaseInterface
     }
 
     /**
+     * @inheritDoc
+     */
+    public function beginTransaction(): bool
+    {
+        return $this->mysqli->begin_transaction();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function commit(): bool
+    {
+        return $this->mysqli->commit();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function rollback(): bool
+    {
+        return $this->mysqli->rollback();
+    }
+
+    /**
      * Because mysqli can't handle named placeholders, we need to convert them to question marks.
      *
      * @param string $sql sql

@@ -821,4 +821,41 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->expectExceptionMessage("Scope 'nonexistent' does not exist");
         $record->scope('nonexistent');
     }
+
+    public function testTransactionSqlGeneration()
+    {
+        $pdo_mock = $this->createMock(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->expects($this->once())->method('beginTransaction')->willReturn(true);
+        $pdo_mock->expects($this->once())->method('commit')->willReturn(true);
+        $pdo_mock->expects($this->never())->method('rollBack');
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $result = $record->transaction(function ($r) use ($record) {
+            $this->assertSame($record, $r);
+            return 'done';
+        });
+        $this->assertSame('done', $result);
+    }
+
+    public function testTransactionRollbackCallsAdapter()
+    {
+        $pdo_mock = $this->createMock(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->expects($this->once())->method('beginTransaction')->willReturn(true);
+        $pdo_mock->expects($this->once())->method('rollBack')->willReturn(true);
+        $pdo_mock->expects($this->never())->method('commit');
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        try {
+            $record->transaction(function () {
+                throw new \Exception('boom');
+            });
+            $this->fail('Exception should have been re-thrown');
+        } catch (\Exception $e) {
+            $this->assertSame('boom', $e->getMessage());
+        }
+    }
 }

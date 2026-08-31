@@ -1530,4 +1530,112 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue($found->isHydrated());
         $this->assertSame('bob', $found->name);
     }
+
+    public function testTransactionCommit()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->transaction(function ($u) {
+            $u->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+            $u->insert();
+        });
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(1, $check->count());
+    }
+
+    public function testTransactionRollback()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'keep', 'password' => 'pass' ]);
+        $user->insert();
+
+        try {
+            $user->transaction(function ($u) {
+                $u->dirty([ 'name' => 'rolled', 'password' => 'pass2' ]);
+                $u->insert();
+                throw new \Exception('boom');
+            });
+            $this->fail('Exception should have been re-thrown');
+        } catch (\Exception $e) {
+            $this->assertSame('boom', $e->getMessage());
+        }
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(1, $check->count());
+    }
+
+    public function testTransactionReturnsValue()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $result = $user->transaction(function ($u) {
+            $u->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+            $u->insert();
+            return 42;
+        });
+
+        $this->assertSame(42, $result);
+    }
+
+    public function testTransactionRethrowsException()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('boom');
+        $user->transaction(function () {
+            throw new \Exception('boom');
+        });
+    }
+
+    public function testTransactionMultipleInserts()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->transaction(function ($u) {
+            $u->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+            $u->insert();
+            $u->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+            $u->insert();
+        });
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(2, $check->count());
+    }
+
+    public function testTransactionRollbackPreservesState()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'keep', 'password' => 'pass' ]);
+        $user->insert();
+
+        try {
+            $user->transaction(function ($u) {
+                $u->dirty([ 'name' => 'doomed', 'password' => 'pass2' ]);
+                $u->insert();
+                throw new \Exception('rollback');
+            });
+            $this->fail('Exception should have been re-thrown');
+        } catch (\Exception $e) {
+            // expected
+        }
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('keep', $check->name);
+        $this->assertSame(1, $check->count());
+    }
+
+    public function testTransactionNestedAttempts()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+
+        try {
+            $user->transaction(function ($u) {
+                $u->transaction(function () {
+                    return null;
+                });
+            });
+            $this->fail('Nested transactions are not supported and should throw');
+        } catch (\Exception $e) {
+            $this->assertStringContainsString('transaction', strtolower($e->getMessage()));
+        }
+    }
 }

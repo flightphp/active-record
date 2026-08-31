@@ -281,4 +281,17 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $this->expectExceptionMessage('No results found');
         $MysqliStatementAdapter->fetchColumn();
     }
+
+    public function testTransactionMethods()
+    {
+        $mysqli = $this->createMock(mysqli::class);
+        $mysqli->method('begin_transaction')->willReturn(true);
+        $mysqli->method('commit')->willReturn(true);
+        $mysqli->method('rollback')->willReturn(true);
+        $adapter = new MysqliAdapter($mysqli);
+
+        $this->assertTrue($adapter->beginTransaction());
+        $this->assertTrue($adapter->commit());
+        $this->assertTrue($adapter->rollback());
+    }
 }

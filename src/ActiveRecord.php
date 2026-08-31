@@ -868,6 +868,32 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
 
     /**
+     * Execute a callable within a database transaction.
+     *
+     * If the callable returns normally, the transaction is committed.
+     * If the callable throws, the transaction is rolled back and the exception re-thrown.
+     *
+     * Note: nested transactions are not supported (no savepoints).
+     *
+     * @template T
+     * @param callable(self): T $callback
+     * @return T The return value of the callback
+     * @throws \Throwable Re-thrown if the callback fails
+     */
+    public function transaction(callable $callback)
+    {
+        $this->databaseConnection->beginTransaction();
+        try {
+            $result = $callback($this);
+            $this->databaseConnection->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            $this->databaseConnection->rollback();
+            throw $e;
+        }
+    }
+
+    /**
      * Updates or inserts a record
      *
      * @return ActiveRecord
