@@ -1418,6 +1418,26 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
 
     /**
+     * Call a named scope method on this model by name.
+     *
+     * Scopes are convention-based instance methods on the subclass that return
+     * $this, e.g. `public function published(): self { return $this->eq('status', 'published'); }`.
+     * They must be called on an instance that already has a database connection.
+     *
+     * @param string $name  Scope method name
+     * @param mixed  ...$args Arguments to pass to the scope method
+     * @return self
+     * @throws \BadMethodCallException if the scope method does not exist
+     */
+    public function scope(string $name, ...$args): self
+    {
+        if (method_exists($this, $name) === false) {
+            throw new \BadMethodCallException("Scope '{$name}' does not exist");
+        }
+        return $this->{$name}(...$args);
+    }
+
+    /**
      * ORDER BY a single column with ASC/DESC. Safe when the column name may be untrusted
      * (e.g. from a request), unlike order()/orderBy() which accept raw SQL fragments.
      *

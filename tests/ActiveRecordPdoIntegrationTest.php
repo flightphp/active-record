@@ -1438,4 +1438,96 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
             $this->assertStringContainsString('has no column named created_at', $e->getMessage());
         }
     }
+
+    public function testScopeReturnsConfiguredModel()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function namedBob(): self
+            {
+                return $this->eq('name', 'bob');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $result = $user->namedBob();
+        $this->assertSame($user, $result);
+        $this->assertTrue($user->exists());
+    }
+
+    public function testScopesChainable()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function namedBob(): self
+            {
+                return $this->eq('name', 'bob');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bobby', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $users = $user->namedBob()->eq('password', 'pass')->findAll();
+        $this->assertCount(1, $users);
+        $this->assertSame('bob', $users[0]->name);
+    }
+
+    public function testScopeWithParams()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function nameLike(string $name): self
+            {
+                return $this->like('name', $name . '%');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bobby', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $users = $user->nameLike('bob')->findAll();
+        $this->assertCount(2, $users);
+    }
+
+    public function testScopeHelperByName()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function namedBob(): self
+            {
+                return $this->eq('name', 'bob');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $users = $user->scope('namedBob')->findAll();
+        $this->assertCount(1, $users);
+        $this->assertSame('bob', $users[0]->name);
+    }
+
+    public function testScopeOnConfiguredInstance()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function namedBob(): self
+            {
+                return $this->eq('name', 'bob');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        // Scopes run against the live connection — no null-connection crash
+        $found = $user->namedBob()->find();
+        $this->assertTrue($found->isHydrated());
+        $this->assertSame('bob', $found->name);
+    }
 }

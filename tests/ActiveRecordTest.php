@@ -782,4 +782,43 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->assertStringContainsString('"updated_at"', $sql);
         $this->assertStringNotContainsString('"created_at"', $sql);
     }
+
+    public function testScopeSqlGeneration()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+            public function published(): self
+            {
+                return $this->eq('status', 'published');
+            }
+            public function query(string $sql, array $param = [], ?ActiveRecord $obj = null, bool $single = false)
+            {
+                return $this;
+            }
+        };
+        $record->published()->eq('views', 100)->find();
+        $this->assertStringContainsString(
+            'WHERE test_table.status = :ph1 AND test_table.views = :ph2',
+            $record->getBuiltSql()
+        );
+    }
+
+    public function testScopeHelperReturnsModel()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+            public function published(): self
+            {
+                return $this->eq('status', 'published');
+            }
+        };
+        $this->assertSame($record, $record->scope('published'));
+    }
+
+    public function testScopeHelperThrowsOnUndefined()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+        };
+        $this->expectException(\BadMethodCallException::class);
+        $this->expectExceptionMessage("Scope 'nonexistent' does not exist");
+        $record->scope('nonexistent');
+    }
 }
