@@ -605,4 +605,55 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
 
         $this->assertSame([], $record->pluck('name'));
     }
+
+    public function testFirstSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetch')->willReturn(false);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $result = $record->first();
+        $this->assertInstanceOf(ActiveRecord::class, $result);
+        $this->assertFalse($result->isHydrated());
+        $this->assertStringContainsString('ORDER BY "id" ASC LIMIT 1', $record->getBuiltSql());
+    }
+
+    public function testLastSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetch')->willReturn(false);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $result = $record->last();
+        $this->assertInstanceOf(ActiveRecord::class, $result);
+        $this->assertFalse($result->isHydrated());
+        $this->assertStringContainsString('ORDER BY "id" DESC LIMIT 1', $record->getBuiltSql());
+    }
+
+    public function testFirstSqlGenerationRespectsExistingLimit()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetch')->willReturn(false);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        // find() forces LIMIT 1 regardless (existing contract) — the explicit
+        // limit branch in first() must simply not overwrite the order default.
+        $record->limit(5)->first();
+        $this->assertStringContainsString('ORDER BY "id" ASC LIMIT 1', $record->getBuiltSql());
+    }
 }

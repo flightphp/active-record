@@ -646,6 +646,45 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         return $this->pluck($this->primaryKey);
     }
+
+    /**
+     * Find the first record matching the current query conditions.
+     *
+     * Defaults to ordering by the primary key ascending and limiting to 1
+     * unless an explicit order/limit is already set. Like find(), never
+     * returns null — check isHydrated() when nothing matched.
+     *
+     * @return self
+     */
+    public function first(): self
+    {
+        if ($this->order === null) {
+            $this->orderByColumn($this->primaryKey, 'ASC');
+        }
+        if ($this->limit === null) {
+            $this->limit(1);
+        }
+        return $this->find();
+    }
+
+    /**
+     * Find the last record matching the current query conditions.
+     *
+     * Same as first() but defaults to ordering by the primary key descending.
+     * Like find(), never returns null — check isHydrated() when nothing matched.
+     *
+     * @return self
+     */
+    public function last(): self
+    {
+        if ($this->order === null) {
+            $this->orderByColumn($this->primaryKey, 'DESC');
+        }
+        if ($this->limit === null) {
+            $this->limit(1);
+        }
+        return $this->find();
+    }
     /**
      * Function to delete current record in database.
      * @return bool
@@ -736,6 +775,20 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->processEvent(['afterUpdate', 'afterSave'], [$this]);
 
         return $this->dirty()->resetQueryData();
+    }
+
+    /**
+     * Update a single attribute on this record in the database.
+     *
+     * Requires a loaded record (see update()). Does not run validation.
+     *
+     * @param string $name  Column name
+     * @param mixed  $value New value for the column
+     * @return self
+     */
+    public function updateAttribute(string $name, $value): self
+    {
+        return $this->dirty([ $name => $value ])->update();
     }
 
     /**

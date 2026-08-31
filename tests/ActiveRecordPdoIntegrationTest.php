@@ -1011,4 +1011,126 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
         $this->assertEquals([ 1, 2 ], $user->eq('password', 'pass')->eq('name', 'alice', 'or')->orderByColumn('id')->ids());
     }
+
+    public function testFirstReturnsFirstByPk()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $first = $user->first();
+        $this->assertInstanceOf(User::class, $first);
+        $this->assertSame('bob', $first->name);
+    }
+
+    public function testFirstWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $first = $user->eq('name', 'alice')->first();
+        $this->assertSame('alice', $first->name);
+    }
+
+    public function testFirstEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $first = $user->first();
+        $this->assertInstanceOf(User::class, $first);
+        $this->assertFalse($first->isHydrated());
+    }
+
+    public function testFirstRespectsExplicitOrder()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $first = $user->orderByColumn('name', 'DESC')->first();
+        $this->assertSame('bob', $first->name);
+    }
+
+    public function testLastReturnsLastByPk()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $last = $user->last();
+        $this->assertInstanceOf(User::class, $last);
+        $this->assertSame('alice', $last->name);
+    }
+
+    public function testLastWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $last = $user->eq('password', 'pass')->last();
+        $this->assertSame('bob', $last->name);
+    }
+
+    public function testLastEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $last = $user->last();
+        $this->assertInstanceOf(User::class, $last);
+        $this->assertFalse($last->isHydrated());
+    }
+
+    public function testLastRespectsExplicitOrder()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $last = $user->orderByColumn('name', 'DESC')->last();
+        $this->assertSame('bob', $last->name);
+    }
+
+    public function testUpdateAttributeSingleField()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $loaded = new User(new PDO('sqlite:test.db'));
+        $loaded->find(1);
+        $loaded->updateAttribute('name', 'robert');
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('robert', $check->name);
+        $this->assertSame('pass', $check->password);
+    }
+
+    public function testUpdateAttributeDoesNotTouchOtherFields()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $loaded = new User(new PDO('sqlite:test.db'));
+        $loaded->find(1);
+        $loaded->updateAttribute('password', 'newpass');
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('bob', $check->name);
+        $this->assertSame('newpass', $check->password);
+    }
 }
