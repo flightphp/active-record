@@ -714,19 +714,24 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         );
     }
 
-    public function testUpdateAllSqlGenerationWithRawString()
+    public function testUpdateAllSqlGenerationRequiresWhere()
     {
-        $statement_mock = $this->createStub(PDOStatement::class);
-        $statement_mock->method('execute')->willReturn(true);
-        $statement_mock->method('rowCount')->willReturn(3);
-        $pdo_mock = $this->createStub(PDO::class);
-        $pdo_mock->method('getAttribute')->willReturn('sqlite');
-        $pdo_mock->method('prepare')->willReturn($statement_mock);
-        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        $record = new class (null, 'test_table') extends ActiveRecord {
         };
 
-        $this->assertSame(3, $record->updateAll("password = 'reset'"));
-        $this->assertStringContainsString('UPDATE "test_table" SET password = \'reset\'', $record->getBuiltSql());
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('updateAll() requires WHERE conditions; pass true to update every row');
+        $record->updateAll([ 'password' => 'secret' ]);
+    }
+
+    public function testDeleteAllSqlGenerationRequiresWhere()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+        };
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('deleteAll() requires WHERE conditions; pass true to delete every row');
+        $record->deleteAll();
     }
 
     public function testDeleteAllSqlGeneration()

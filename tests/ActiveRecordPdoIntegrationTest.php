@@ -1201,7 +1201,18 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertSame('pass2', $check2->password);
     }
 
-    public function testUpdateAllNoConditions()
+    public function testUpdateAllRequiresWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('updateAll() requires WHERE conditions; pass true to update every row');
+        $user->updateAll([ 'password' => 'reset' ]);
+    }
+
+    public function testUpdateAllAllowEmptyConditions()
     {
         $user = new User(new PDO('sqlite:test.db'));
         $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
@@ -1211,7 +1222,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
         $user->insert();
 
-        $this->assertSame(3, $user->updateAll([ 'password' => 'reset' ]));
+        $this->assertSame(3, $user->updateAll([ 'password' => 'reset' ], true));
     }
 
     public function testUpdateAllReturnsCount()
@@ -1222,7 +1233,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
         $user->insert();
 
-        $this->assertSame(2, $user->updateAll([ 'password' => 'x' ]));
+        $this->assertSame(2, $user->updateAll([ 'password' => 'x' ], true));
         $this->assertSame(0, $user->eq('name', 'nobody')->updateAll([ 'password' => 'y' ]));
     }
 
@@ -1241,22 +1252,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
         $user->insert();
 
-        $this->assertSame(1, $user->updateAll([ 'password' => 'x' ]));
-    }
-
-    public function testUpdateAllWithRawString()
-    {
-        $user = new User(new PDO('sqlite:test.db'));
-        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
-        $user->insert();
-        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
-        $user->insert();
-
-        $this->assertSame(2, $user->updateAll("password = 'reset'"));
-
-        $check = new User(new PDO('sqlite:test.db'));
-        $check->find(1);
-        $this->assertSame('reset', $check->password);
+        $this->assertSame(1, $user->eq('name', 'bob')->updateAll([ 'password' => 'x' ]));
     }
 
     public function testDeleteAllMatchingRows()
@@ -1271,7 +1267,18 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertSame(1, $user->count());
     }
 
-    public function testDeleteAllNoConditions()
+    public function testDeleteAllRequiresWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('deleteAll() requires WHERE conditions; pass true to delete every row');
+        $user->deleteAll();
+    }
+
+    public function testDeleteAllAllowEmptyConditions()
     {
         $user = new User(new PDO('sqlite:test.db'));
         $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
@@ -1281,7 +1288,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
         $user->insert();
 
-        $this->assertSame(3, $user->deleteAll());
+        $this->assertSame(3, $user->deleteAll(true));
     }
 
     public function testDeleteAllReturnsCount()
@@ -1291,7 +1298,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->insert();
 
         $this->assertSame(0, $user->eq('name', 'nobody')->deleteAll());
-        $this->assertSame(1, $user->deleteAll());
+        $this->assertSame(1, $user->deleteAll(true));
     }
 
     public function testDeleteAllNoCallbacks()
@@ -1309,7 +1316,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
         $user->insert();
 
-        $this->assertSame(1, $user->deleteAll());
+        $this->assertSame(1, $user->eq('name', 'bob')->deleteAll());
     }
 
     public function testInsertSetsTimestamps()

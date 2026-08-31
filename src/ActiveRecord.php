@@ -834,20 +834,22 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      * statement (batch update). No callbacks are fired and no records are
      * hydrated.
      *
-     * @param array|string $attributes Column/value pairs (array) or a raw SET fragment (string)
+     * Refuses to run without WHERE conditions unless $allowEmptyConditions
+     * is explicitly set to true.
+     *
+     * @param array $attributes Column/value pairs
+     * @param bool  $allowEmptyConditions Allow updating every row when no WHERE conditions are set
      * @return int Affected row count
+     * @throws Exception When no WHERE conditions are set and $allowEmptyConditions is false
      */
-    public function updateAll($attributes): int
+    public function updateAll(array $attributes, bool $allowEmptyConditions = false): int
     {
-        if (is_array($attributes)) {
-            foreach ($attributes as $field => $value) {
-                $this->addCondition($field, '=', $value, ',', 'set');
-            }
-        } else {
-            $this->set = new Expressions([
-                'operator' => 'SET',
-                'target' => $attributes
-            ]);
+        if ($allowEmptyConditions === false && $this->where === null) {
+            throw new Exception('updateAll() requires WHERE conditions; pass true to update every row');
+        }
+
+        foreach ($attributes as $field => $value) {
+            $this->addCondition($field, '=', $value, ',', 'set');
         }
 
         return $this->execute($this->buildSql(['update', 'set', 'where']), $this->params)->rowCount();
@@ -858,12 +860,19 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      * statement (batch delete). No callbacks are fired and no records are
      * hydrated.
      *
-     * With no WHERE conditions set, deletes every row in the table.
+     * Refuses to run without WHERE conditions unless $allowEmptyConditions
+     * is explicitly set to true.
      *
+     * @param bool $allowEmptyConditions Allow deleting every row when no WHERE conditions are set
      * @return int Affected row count
+     * @throws Exception When no WHERE conditions are set and $allowEmptyConditions is false
      */
-    public function deleteAll(): int
+    public function deleteAll(bool $allowEmptyConditions = false): int
     {
+        if ($allowEmptyConditions === false && $this->where === null) {
+            throw new Exception('deleteAll() requires WHERE conditions; pass true to delete every row');
+        }
+
         return $this->execute($this->buildSql(['delete', 'from', 'where']), $this->params)->rowCount();
     }
 
