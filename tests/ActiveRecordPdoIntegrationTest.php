@@ -49,6 +49,8 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS user;");
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS my_text_table;");
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS distinct_test;");
+        $this->ActiveRecord->execute("DROP TABLE IF EXISTS timestamped;");
+        $this->ActiveRecord->execute("DROP TABLE IF EXISTS no_ts_columns;");
     }
 
     public function testInsert()
@@ -1308,5 +1310,132 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->insert();
 
         $this->assertSame(1, $user->deleteAll());
+    }
+
+    public function testInsertSetsTimestamps()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $this->assertNotNull($record->created_at);
+        $this->assertNotNull($record->updated_at);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $record->created_at);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $record->updated_at);
+    }
+
+    public function testUpdateSetsUpdatedAt()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+        $created_at = $record->created_at;
+
+        $loaded = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $loaded->find(1);
+        $loaded->updateAttribute('name', 'robert');
+
+        $this->assertSame($created_at, $loaded->created_at);
+        $this->assertNotNull($loaded->updated_at);
+        $this->assertGreaterThanOrEqual($created_at, $loaded->updated_at);
+    }
+
+    public function testTimestampsDisabledByDefault()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $this->assertNull($record->created_at);
+        $this->assertNull($record->updated_at);
+    }
+
+    public function testTimestampsDontOverwrite()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->created_at = '2024-01-01 00:00:00';
+        $record->updated_at = '2024-01-01 00:00:00';
+        $record->name = 'bob';
+        $record->insert();
+
+        $this->assertSame('2024-01-01 00:00:00', $record->created_at);
+        $this->assertSame('2024-01-01 00:00:00', $record->updated_at);
+    }
+
+    public function testTimestampsWithCustomFormat()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+            protected function setTimestamps(bool $isNew = true): void
+            {
+                if ($isNew === true) {
+                    $this->created_at = 'custom-created';
+                }
+                $this->updated_at = 'custom-updated';
+            }
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $this->assertSame('custom-created', $record->created_at);
+        $this->assertSame('custom-updated', $record->updated_at);
+    }
+
+    public function testTimestampsMissingColumnsErrors()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE no_ts_columns (
+            id INTEGER PRIMARY KEY,
+            name TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'no_ts_columns') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+
+        try {
+            $record->insert();
+            $this->fail('Enabling timestamps on a table without the columns should error');
+        } catch (\Exception $e) {
+            $this->assertStringContainsString('has no column named created_at', $e->getMessage());
+        }
     }
 }

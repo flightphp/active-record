@@ -172,6 +172,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected bool $isDistinct = false;
 
     /**
+     * @var boolean Whether created_at/updated_at are managed automatically on insert/update
+     */
+    protected bool $timestamps = false;
+
+    /**
      * The construct
      *
      * @param mixed   $databaseConnection  Database object (PDO, mysqli, etc)
@@ -707,11 +712,35 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         return $result instanceof DatabaseStatementInterface;
     }
     /**
+     * Set timestamp columns on insert/update if $this->timestamps is true.
+     *
+     * Explicitly dirty values are never overwritten.
+     *
+     * @param bool $isNew True when inserting, false when updating
+     * @return void
+     */
+    protected function setTimestamps(bool $isNew = true): void
+    {
+        if ($this->timestamps === false) {
+            return;
+        }
+        $now = date('Y-m-d H:i:s');
+        if ($isNew === true && array_key_exists('created_at', $this->dirty) === false) {
+            $this->created_at = $now;
+        }
+        if (array_key_exists('updated_at', $this->dirty) === false) {
+            $this->updated_at = $now;
+        }
+    }
+
+    /**
      * function to build insert SQL, and insert current record into database.
      * @return bool|ActiveRecord if insert success return current object
      */
     public function insert(): ActiveRecord
     {
+        $this->setTimestamps(true);
+
         // execute this before anything else, this could change $this->dirty
         $this->processEvent(['beforeInsert', 'beforeSave'], [$this]);
 
@@ -765,6 +794,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function update(): ActiveRecord
     {
+        $this->setTimestamps(false);
+
         $this->processEvent(['beforeUpdate', 'beforeSave'], [$this]);
 
         // Sync typed public properties that changed since the last find/sync.

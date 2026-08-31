@@ -746,4 +746,40 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
             $record->getBuiltSql()
         );
     }
+
+    public function testTimestampsSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $sql = $record->getBuiltSql();
+        $this->assertStringContainsString('"created_at"', $sql);
+        $this->assertStringContainsString('"updated_at"', $sql);
+    }
+
+    public function testTimestampsUpdateSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->update();
+
+        $sql = $record->getBuiltSql();
+        $this->assertStringContainsString('"updated_at"', $sql);
+        $this->assertStringNotContainsString('"created_at"', $sql);
+    }
 }
