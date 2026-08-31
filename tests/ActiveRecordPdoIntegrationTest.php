@@ -1178,4 +1178,135 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
         $this->assertSame([ 'bob', 'alice' ], $user->orderByColumn('id')->distinct()->pluck('name'));
     }
+
+    public function testUpdateAllMatchingRows()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $count = $user->eq('name', 'bob')->updateAll([ 'password' => 'newpass' ]);
+        $this->assertSame(1, $count);
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('newpass', $check->password);
+
+        $check2 = new User(new PDO('sqlite:test.db'));
+        $check2->find(2);
+        $this->assertSame('pass2', $check2->password);
+    }
+
+    public function testUpdateAllNoConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame(3, $user->updateAll([ 'password' => 'reset' ]));
+    }
+
+    public function testUpdateAllReturnsCount()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame(2, $user->updateAll([ 'password' => 'x' ]));
+        $this->assertSame(0, $user->eq('name', 'nobody')->updateAll([ 'password' => 'y' ]));
+    }
+
+    public function testUpdateAllNoCallbacks()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            protected function beforeUpdate(self $self)
+            {
+                throw new \Exception('beforeUpdate should not fire for batch updates');
+            }
+            protected function afterUpdate(self $self)
+            {
+                throw new \Exception('afterUpdate should not fire for batch updates');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertSame(1, $user->updateAll([ 'password' => 'x' ]));
+    }
+
+    public function testUpdateAllWithRawString()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame(2, $user->updateAll("password = 'reset'"));
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('reset', $check->password);
+    }
+
+    public function testDeleteAllMatchingRows()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame(1, $user->eq('name', 'bob')->deleteAll());
+        $this->assertSame(1, $user->count());
+    }
+
+    public function testDeleteAllNoConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame(3, $user->deleteAll());
+    }
+
+    public function testDeleteAllReturnsCount()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertSame(0, $user->eq('name', 'nobody')->deleteAll());
+        $this->assertSame(1, $user->deleteAll());
+    }
+
+    public function testDeleteAllNoCallbacks()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            protected function beforeDelete(self $self)
+            {
+                throw new \Exception('beforeDelete should not fire for batch deletes');
+            }
+            protected function afterDelete(self $self)
+            {
+                throw new \Exception('afterDelete should not fire for batch deletes');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertSame(1, $user->deleteAll());
+    }
 }

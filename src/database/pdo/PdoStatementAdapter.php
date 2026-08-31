@@ -52,4 +52,12 @@ class PdoStatementAdapter implements DatabaseStatementInterface
     {
         return $this->statement->fetchColumn(0);
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function rowCount(): int
+    {
+        return $this->statement->rowCount();
+    }
 }

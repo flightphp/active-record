@@ -31,4 +31,11 @@ interface DatabaseStatementInterface
      * @return mixed The column value, null for SQL NULL, or false if no row is available
      */
     public function fetchColumn();
+
+    /**
+     * Number of rows affected by the last statement.
+     *
+     * @return int
+     */
+    public function rowCount(): int;
 }

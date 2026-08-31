@@ -695,4 +695,55 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $record->distinct()->find();
         $this->assertFalse($record->getIsDistinct());
     }
+
+    public function testUpdateAllSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('rowCount')->willReturn(2);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertSame(2, $record->eq('name', 'John')->updateAll([ 'password' => 'secret' ]));
+        $this->assertStringContainsString(
+            'UPDATE "test_table" SET "password" = :ph2 WHERE "test_table"."name" = :ph1',
+            $record->getBuiltSql()
+        );
+    }
+
+    public function testUpdateAllSqlGenerationWithRawString()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('rowCount')->willReturn(3);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertSame(3, $record->updateAll("password = 'reset'"));
+        $this->assertStringContainsString('UPDATE "test_table" SET password = \'reset\'', $record->getBuiltSql());
+    }
+
+    public function testDeleteAllSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('rowCount')->willReturn(1);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertSame(1, $record->eq('name', 'John')->deleteAll());
+        $this->assertStringContainsString(
+            'DELETE FROM "test_table" WHERE "test_table"."name" = :ph1',
+            $record->getBuiltSql()
+        );
+    }
 }

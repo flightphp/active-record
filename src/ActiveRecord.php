@@ -799,6 +799,44 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
 
     /**
+     * Update all records matching the current query conditions in a single
+     * statement (batch update). No callbacks are fired and no records are
+     * hydrated.
+     *
+     * @param array|string $attributes Column/value pairs (array) or a raw SET fragment (string)
+     * @return int Affected row count
+     */
+    public function updateAll($attributes): int
+    {
+        if (is_array($attributes)) {
+            foreach ($attributes as $field => $value) {
+                $this->addCondition($field, '=', $value, ',', 'set');
+            }
+        } else {
+            $this->set = new Expressions([
+                'operator' => 'SET',
+                'target' => $attributes
+            ]);
+        }
+
+        return $this->execute($this->buildSql(['update', 'set', 'where']), $this->params)->rowCount();
+    }
+
+    /**
+     * Delete all records matching the current query conditions in a single
+     * statement (batch delete). No callbacks are fired and no records are
+     * hydrated.
+     *
+     * With no WHERE conditions set, deletes every row in the table.
+     *
+     * @return int Affected row count
+     */
+    public function deleteAll(): int
+    {
+        return $this->execute($this->buildSql(['delete', 'from', 'where']), $this->params)->rowCount();
+    }
+
+    /**
      * Updates or inserts a record
      *
      * @return ActiveRecord

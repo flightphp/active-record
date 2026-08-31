@@ -119,6 +119,15 @@ class MysqliStatementAdapter implements DatabaseStatementInterface
     }
 
     /**
+     * @inheritDoc
+     * @codeCoverageIgnore Can't mock this if your life depends on it.
+     */
+    public function rowCount(): int
+    {
+        return $this->statement->affected_rows;
+    }
+
+    /**
      * Gets the error list (easier to mock with unit testing)
      *
      * @return array
