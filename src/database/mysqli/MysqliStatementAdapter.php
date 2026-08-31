@@ -88,6 +88,37 @@ class MysqliStatementAdapter implements DatabaseStatementInterface
     }
 
     /**
+     * @inheritDoc
+     */
+    public function fetchColumn()
+    {
+        // If there are no more results to fetch, return false.
+        if ($this->allResultsCount > 0 && $this->resultIndex >= $this->allResultsCount) {
+            return false;
+        }
+
+        // If it hasn't run the query just yet, run it and store the first column of all rows.
+        if ($this->resultIndex === 0) {
+            $raw_result = $this->statement->get_result();
+            if ($raw_result === false) {
+                throw new Exception($this->getErrorList()[0]['error']);
+            }
+
+            while ($row = $raw_result->fetch_row()) {
+                $this->allResults[] = $row[0];
+                ++$this->allResultsCount;
+            }
+        }
+
+        // No results to fetch
+        if ($this->allResultsCount === 0) {
+            return false;
+        }
+
+        return $this->allResults[$this->resultIndex++];
+    }
+
+    /**
      * Gets the error list (easier to mock with unit testing)
      *
      * @return array

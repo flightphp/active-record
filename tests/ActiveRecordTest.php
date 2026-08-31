@@ -483,4 +483,83 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->assertStringContainsString('"name" = :ph', $sql);
         $this->assertStringNotContainsString($payload, $sql);
     }
+
+    public function testCountSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetchColumn')->willReturn('3');
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertSame(3, $record->eq('status', 'active')->count());
+        $sql = $record->getBuiltSql();
+        $this->assertStringContainsString('SELECT COUNT(*)', $sql);
+        $this->assertStringContainsString('WHERE "test_table"."status" = :ph1', $sql);
+        $this->assertStringNotContainsString('GROUP BY', $sql);
+    }
+
+    public function testCountSqlGenerationIgnoresGroup()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetchColumn')->willReturn('3');
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $record->groupBy('name')->count();
+        $this->assertStringNotContainsString('GROUP BY', $record->getBuiltSql());
+    }
+
+    public function testExistsSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetchColumn')->willReturn('1');
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertTrue($record->eq('name', 'John')->exists());
+        $sql = $record->getBuiltSql();
+        $this->assertStringContainsString('SELECT 1', $sql);
+        $this->assertStringContainsString('LIMIT 1', $sql);
+    }
+
+    public function testExistsSqlGenerationNoMatch()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetchColumn')->willReturn(false);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertFalse($record->eq('name', 'Nobody')->exists());
+    }
+
+    public function testExistsSqlGenerationRespectsExistingLimit()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetchColumn')->willReturn('1');
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertTrue($record->eq('name', 'John')->limit(5)->exists());
+        $this->assertStringContainsString('LIMIT 5', $record->getBuiltSql());
+    }
 }

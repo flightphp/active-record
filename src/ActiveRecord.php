@@ -582,6 +582,45 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->processEvent('afterFindAll', [$results]);
         return $results;
     }
+
+    /**
+     * Count the number of records matching the current query conditions.
+     *
+     * Any active group/groupBy is intentionally ignored: `SELECT COUNT(*) ... GROUP BY`
+     * returns one row per group, which a single scalar count cannot represent.
+     *
+     * @return int
+     */
+    public function count(): int
+    {
+        $this->select = new Expressions([
+            'operator' => 'SELECT COUNT(*) AS _ar_count'
+        ]);
+
+        $result = $this->queryScalar($this->buildSql(['select', 'from', 'join', 'where', 'having']), $this->params);
+
+        return (int) $result;
+    }
+
+    /**
+     * Whether any records match the current query conditions.
+     *
+     * @return bool
+     */
+    public function exists(): bool
+    {
+        $this->select = new Expressions([
+            'operator' => 'SELECT 1'
+        ]);
+
+        if ($this->limit === null) {
+            $this->limit(1);
+        }
+
+        $result = $this->queryScalar($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'limit']), $this->params);
+
+        return $result !== false;
+    }
     /**
      * Function to delete current record in database.
      * @return bool
@@ -749,6 +788,18 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $result[] = $new_obj;
         }
         return $result;
+    }
+
+    /**
+     * Execute a SQL query and return a single scalar value.
+     *
+     * @param string $sql    SQL with named placeholders
+     * @param array  $params Bound parameters
+     * @return mixed The first column of the first row, or false if no row is available
+     */
+    private function queryScalar(string $sql, array $params = [])
+    {
+        return $this->execute($sql, $params)->fetchColumn();
     }
     /**
      * helper function to get relation of this object.

@@ -44,4 +44,12 @@ class PdoStatementAdapter implements DatabaseStatementInterface
         $this->statement->setFetchMode(PDO::FETCH_INTO, $object);
         return $this->statement->fetch();
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function fetchColumn()
+    {
+        return $this->statement->fetchColumn(0);
+    }
 }

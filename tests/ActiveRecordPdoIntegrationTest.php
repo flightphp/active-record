@@ -777,4 +777,123 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertIsArray($user->contacts);
         $this->assertEquals(0, count($user->contacts));
     }
+
+    public function testCountAll()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame(3, $user->count());
+    }
+
+    public function testCountWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame(2, $user->like('name', 'bob%')->count());
+    }
+
+    public function testCountEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(0, $user->count());
+    }
+
+    public function testCountIgnoresGroup()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        // Two distinct names: a grouped count would be 2. The total is 3.
+        $this->assertSame(3, $user->groupBy('name')->count());
+    }
+
+    public function testExistsTrue()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertTrue($user->eq('name', 'bob')->exists());
+    }
+
+    public function testExistsFalse()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertFalse($user->eq('name', 'nobody')->exists());
+    }
+
+    public function testExistsNoConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertTrue($user->exists());
+    }
+
+    public function testExistsEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $this->assertFalse($user->exists());
+    }
+
+    public function testChainingCount()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'active', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'active', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame(2, $user->eq('name', 'active')->count());
+    }
+
+    public function testChainingExists()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertFalse($user->eq('name', 'nonexistent')->exists());
+    }
+
+    public function testFetchColumnInterface()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $statement = $this->ActiveRecord->execute('SELECT name FROM user ORDER BY id ASC');
+        $this->assertSame('bob', $statement->fetchColumn());
+        $this->assertSame('bob2', $statement->fetchColumn());
+        $this->assertFalse($statement->fetchColumn());
+    }
+
+    public function testFetchColumnReturnsFalseWhenNoRows()
+    {
+        $statement = $this->ActiveRecord->execute('SELECT name FROM user WHERE 1 = 0');
+        $this->assertFalse($statement->fetchColumn());
+    }
 }
