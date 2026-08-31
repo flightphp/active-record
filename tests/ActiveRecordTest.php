@@ -562,4 +562,47 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue($record->eq('name', 'John')->limit(5)->exists());
         $this->assertStringContainsString('LIMIT 5', $record->getBuiltSql());
     }
+
+    public function testPluckSqlGeneration()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetchColumn')->willReturnOnConsecutiveCalls('bob', false);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertSame([ 'bob' ], $record->pluck('name'));
+        $this->assertStringContainsString('SELECT "name" FROM "test_table"', $record->getBuiltSql());
+    }
+
+    public function testPluckMultipleRows()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetchColumn')->willReturnOnConsecutiveCalls('bob', 'bob2', 'alice', false);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertSame([ 'bob', 'bob2', 'alice' ], $record->pluck('name'));
+    }
+
+    public function testPluckEmptyResultSet()
+    {
+        $statement_mock = $this->createStub(PDOStatement::class);
+        $statement_mock->method('execute')->willReturn(true);
+        $statement_mock->method('fetchColumn')->willReturn(false);
+        $pdo_mock = $this->createStub(PDO::class);
+        $pdo_mock->method('getAttribute')->willReturn('sqlite');
+        $pdo_mock->method('prepare')->willReturn($statement_mock);
+        $record = new class ($pdo_mock, 'test_table') extends ActiveRecord {
+        };
+
+        $this->assertSame([], $record->pluck('name'));
+    }
 }

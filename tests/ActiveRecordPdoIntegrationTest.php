@@ -896,4 +896,119 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $statement = $this->ActiveRecord->execute('SELECT name FROM user WHERE 1 = 0');
         $this->assertFalse($statement->fetchColumn());
     }
+
+    public function testPluckSingleColumn()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'bob2', 'alice' ], $user->orderByColumn('id')->pluck('name'));
+    }
+
+    public function testPluckWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'bob2' ], $user->like('name', 'bob%')->orderByColumn('id')->pluck('name'));
+    }
+
+    public function testPluckEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $this->assertSame([], $user->pluck('name'));
+    }
+
+    public function testPluckPreservesType()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        // Strings stay strings, and numeric keys stay numeric for the driver in use
+        $this->assertSame([ 'bob', 'bob2' ], $user->orderByColumn('id')->pluck('name'));
+        $this->assertEquals([ 1, 2 ], $user->orderByColumn('id')->pluck('id'));
+    }
+
+    public function testPluckWithOrder()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'alice' ], $user->orderByColumn('name', 'DESC')->pluck('name'));
+    }
+
+    public function testPluckWithLimit()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'bob2' ], $user->orderByColumn('id')->limit(2)->pluck('name'));
+    }
+
+    public function testPluckWithNullValuesDoesNotTruncate()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => null, 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', null, 'alice' ], $user->orderByColumn('id')->pluck('name'));
+    }
+
+    public function testIdsReturnsPrimaryKeys()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertEquals([ 1, 2 ], $user->orderByColumn('id')->ids());
+    }
+
+    public function testIdsWithConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertEquals([ 2 ], $user->eq('name', 'alice')->ids());
+    }
+
+    public function testChainingIds()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertEquals([ 1, 2 ], $user->eq('password', 'pass')->eq('name', 'alice', 'or')->orderByColumn('id')->ids());
+    }
 }

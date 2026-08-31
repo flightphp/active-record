@@ -621,6 +621,31 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
         return $result !== false;
     }
+
+    /**
+     * Fetch a single column's values for all matching records.
+     *
+     * @param string $column Column name
+     * @return array<int, mixed>
+     */
+    public function pluck(string $column): array
+    {
+        $this->select = new Expressions([
+            'operator' => 'SELECT ' . $this->escapeIdentifier($column)
+        ]);
+
+        return $this->queryColumn($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params);
+    }
+
+    /**
+     * Fetch the primary keys of all matching records.
+     *
+     * @return array<int, mixed>
+     */
+    public function ids(): array
+    {
+        return $this->pluck($this->primaryKey);
+    }
     /**
      * Function to delete current record in database.
      * @return bool
@@ -800,6 +825,23 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     private function queryScalar(string $sql, array $params = [])
     {
         return $this->execute($sql, $params)->fetchColumn();
+    }
+
+    /**
+     * Execute a SQL query and return an array of values from a single column.
+     *
+     * @param string $sql    SQL with named placeholders
+     * @param array  $params Bound parameters
+     * @return array<int, mixed>
+     */
+    private function queryColumn(string $sql, array $params = []): array
+    {
+        $statement = $this->execute($sql, $params);
+        $values = [];
+        while (($value = $statement->fetchColumn()) !== false) {
+            $values[] = $value;
+        }
+        return $values;
     }
     /**
      * helper function to get relation of this object.
