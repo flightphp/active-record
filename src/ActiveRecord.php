@@ -1244,10 +1244,10 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected function buildSqlCallback(string $sqlStatement, ActiveRecord $object): string
     {
         // First add the SELECT table.*
-        if ('select' === $sqlStatement && null == $object->$sqlStatement) {
+        if ('select' === $sqlStatement && null === $object->$sqlStatement) {
             $prefix = $object->isDistinct ? 'SELECT DISTINCT ' : 'SELECT ';
             $sqlStatement = $prefix . $this->escapeIdentifier($object->table) . '.*';
-        } elseif (('update' === $sqlStatement || 'from' === $sqlStatement) && null == $object->$sqlStatement) {
+        } elseif (('update' === $sqlStatement || 'from' === $sqlStatement) && null === $object->$sqlStatement) {
             $sqlStatement = strtoupper($sqlStatement) . ' ' . $this->escapeIdentifier($object->table);
         } elseif ('delete' === $sqlStatement) {
             $sqlStatement = strtoupper($sqlStatement);
@@ -1272,8 +1272,6 @@ abstract class ActiveRecord extends Base implements JsonSerializable
                 $finalSql[] = $statement;
             }
         }
-        //this code to debug info.
-        //echo 'SQL: ', implode(' ', $sqlStatements), "\n", "PARAMS: ", implode(', ', $this->params), "\n";
         $this->builtSql = implode(' ', $finalSql);
 
         // get rid of multiple spaces in the query for prettiness

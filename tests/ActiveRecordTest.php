@@ -813,7 +813,7 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $this->assertSame($record, $record->scope('published'));
     }
 
-    public function testScopeHelperThrowsOnUndefined()
+    public function testScopeThrowsOnUndefined()
     {
         $record = new class (null, 'test_table') extends ActiveRecord {
         };
