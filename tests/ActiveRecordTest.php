@@ -656,4 +656,43 @@ class ActiveRecordTest extends \PHPUnit\Framework\TestCase
         $record->limit(5)->first();
         $this->assertStringContainsString('ORDER BY "id" ASC LIMIT 1', $record->getBuiltSql());
     }
+
+    public function testDistinctSqlGeneration()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+            public function query(string $sql, array $param = [], ?ActiveRecord $obj = null, bool $single = false)
+            {
+                return $this;
+            }
+        };
+        $record->distinct()->find();
+        $this->assertStringContainsString('SELECT DISTINCT test_table.*', $record->getBuiltSql());
+    }
+
+    public function testDistinctDefaultFalse()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+            public function getIsDistinct()
+            {
+                return $this->isDistinct;
+            }
+        };
+        $this->assertFalse($record->getIsDistinct());
+    }
+
+    public function testDistinctResetsAfterQuery()
+    {
+        $record = new class (null, 'test_table') extends ActiveRecord {
+            public function getIsDistinct()
+            {
+                return $this->isDistinct;
+            }
+            public function query(string $sql, array $param = [], ?ActiveRecord $obj = null, bool $single = false)
+            {
+                return $this;
+            }
+        };
+        $record->distinct()->find();
+        $this->assertFalse($record->getIsDistinct());
+    }
 }

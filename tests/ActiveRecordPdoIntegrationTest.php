@@ -48,6 +48,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS contact;");
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS user;");
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS my_text_table;");
+        $this->ActiveRecord->execute("DROP TABLE IF EXISTS distinct_test;");
     }
 
     public function testInsert()
@@ -1132,5 +1133,49 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $check->find(1);
         $this->assertSame('bob', $check->name);
         $this->assertSame('newpass', $check->password);
+    }
+
+    public function testDistinctProducesSelectDistinct()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE distinct_test (name TEXT)");
+        $record = new class (new PDO('sqlite:test.db'), 'distinct_test') extends ActiveRecord {
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $rows = $record->distinct()->findAll();
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString('SELECT DISTINCT "distinct_test".*', $record->getBuiltSql());
+    }
+
+    public function testDistinctWithWhere()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE distinct_test (name TEXT)");
+        $record = new class (new PDO('sqlite:test.db'), 'distinct_test') extends ActiveRecord {
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+        $record->dirty([ 'name' => 'alice' ]);
+        $record->insert();
+
+        $rows = $record->eq('name', 'bob')->distinct()->findAll();
+        $this->assertCount(1, $rows);
+    }
+
+    public function testDistinctWithPluck()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'alice' ], $user->orderByColumn('id')->distinct()->pluck('name'));
     }
 }

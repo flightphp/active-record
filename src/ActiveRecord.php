@@ -167,6 +167,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected bool $isHydrated = false;
 
     /**
+     * @var boolean Whether the next SELECT query should use SELECT DISTINCT
+     */
+    protected bool $isDistinct = false;
+
+    /**
      * The construct
      *
      * @param mixed   $databaseConnection  Database object (PDO, mysqli, etc)
@@ -354,6 +359,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->sqlExpressions = [];
         $this->join = null;
         $this->eagerLoad = [];
+        $this->isDistinct = false;
         return $this;
     }
     /**
@@ -630,8 +636,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function pluck(string $column): array
     {
+        $prefix = $this->isDistinct ? 'SELECT DISTINCT ' : 'SELECT ';
         $this->select = new Expressions([
-            'operator' => 'SELECT ' . $this->escapeIdentifier($column)
+            'operator' => $prefix . $this->escapeIdentifier($column)
         ]);
 
         return $this->queryColumn($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params);
@@ -1143,7 +1150,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         // First add the SELECT table.*
         if ('select' === $sqlStatement && null == $object->$sqlStatement) {
-            $sqlStatement = strtoupper($sqlStatement) . ' ' . $this->escapeIdentifier($object->table) . '.*';
+            $prefix = $object->isDistinct ? 'SELECT DISTINCT ' : 'SELECT ';
+            $sqlStatement = $prefix . $this->escapeIdentifier($object->table) . '.*';
         } elseif (('update' === $sqlStatement || 'from' === $sqlStatement) && null == $object->$sqlStatement) {
             $sqlStatement = strtoupper($sqlStatement) . ' ' . $this->escapeIdentifier($object->table);
         } elseif ('delete' === $sqlStatement) {
@@ -1323,6 +1331,20 @@ abstract class ActiveRecord extends Base implements JsonSerializable
                 ]
             )
         ]);
+        return $this;
+    }
+
+    /**
+     * Select distinct rows on the next query.
+     *
+     * Applies to the default table.* select and to pluck(); count() deliberately
+     * ignores it (DISTINCT over a single aggregate row is a no-op).
+     *
+     * @return self
+     */
+    public function distinct(): self
+    {
+        $this->isDistinct = true;
         return $this;
     }
 
