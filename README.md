@@ -6,6 +6,14 @@
 
 An active record is mapping a database entity to a PHP object. Spoken plainly, if you have a users table in your database, you can "translate" a row in that table to a `User` class and a `$user` object in your codebase. See [basic example](#basic-example).
 
+## Installation
+
+Simply install with Composer
+
+```php
+composer require flightphp/active-record 
+```
+
 ## Basic Example
 
 Let's assume you have the following table:
@@ -88,17 +96,108 @@ $users = $user->like('name', '%mamma%')->findAll();
 
 See how much fun this is? Let's install it and get started!
 
-## Installation
-
-Simply install with Composer
+## Aggregate Queries
 
 ```php
-composer require flightphp/active-record 
+// Count rows with conditions
+$user->count();
+$user->eq('status', 'active')->count();
+
+// Check if any rows match
+$user->eq('name', 'Bobby')->exists(); // true
+```
+
+## Scalar Extraction
+
+```php
+// Get flat array of values from a single column
+$user->pluck('name'); // ['Bobby', 'Joseph', ...]
+
+// Get primary keys
+$user->ids(); // [1, 2, ...]
+```
+
+## Convenient Finders
+
+```php
+// Get first/last record (ordered by primary key)
+$user->first();
+$user->last();
+
+// Update a single attribute on a loaded record
+$loadedUser = $user->find(1);
+$loadedUser->updateAttribute('name', 'New Name');
+```
+
+## Distinct
+
+```php
+$user->distinct()->pluck('status'); // ['active', 'inactive', ...]
+```
+
+## Batch Operations
+
+```php
+// Update multiple rows
+$user->eq('status', 'inactive')->updateAll(['status' => 'active']);
+
+// Delete multiple rows (use with caution!)
+$user->eq('status', 'deleted')->deleteAll();
+```
+
+## Timestamps
+
+Automatically set `created_at` and `updated_at` columns:
+
+```php
+class User extends ActiveRecord
+{
+    protected bool $timestamps = true;
+
+    public function __construct($databaseConnection)
+    {
+        parent::__construct($databaseConnection, 'users');
+    }
+}
+```
+
+## Scopes
+
+Define reusable query chains as methods:
+
+```php
+class User extends ActiveRecord
+{
+    public function active(): self
+    {
+        return $this->eq('status', 'active');
+    }
+
+    public function recent(int $days = 7): self
+    {
+        return $this->ge('created_at', date('Y-m-d', strtotime("-{$days} days")));
+    }
+}
+
+// Usage
+$users = (new User($db))->active()->findAll();
+$recent = (new User($db))->active()->recent(30)->findAll();
+```
+
+## Transactions
+
+Wrap multiple operations in a transaction:
+
+```php
+$user->transaction(function ($model) {
+    $model->insert();
+    // Automatically commits on success, rolls back on exception
+});
 ```
 
 ## Documentation
 
-Head over to the [documentation page](https://docs.flightphp.com/awesome-plugins/active-record) to learn more about usage and how cool this thing is! :)
+Head over to the [documentation page](https://docs.flightphp.com/en/v3/awesome-plugins/active-record) to learn more about usage and how cool this thing is! :)
 
 ## License
 

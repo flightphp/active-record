@@ -116,7 +116,7 @@ class RecordCommand extends AbstractBaseCommand
 
         $class->addComment('ActiveRecord class for the ' . $tableName . ' table.');
 
-        $class->addComment('@link https://docs.flightphp.com/awesome-plugins/active-record');
+        $class->addComment('@link https://docs.flightphp.com/en/v3/awesome-plugins/active-record');
         $class->addComment('');
 
         foreach ($fields as $field) {
@@ -126,7 +126,7 @@ class RecordCommand extends AbstractBaseCommand
             ->setVisibility('protected')
             ->setType('array')
             ->setValue([])
-            ->addComment('@var array $relations Set the relationships for the model' . "\n" . '  https://docs.flightphp.com/awesome-plugins/active-record#relationships');
+            ->addComment('@var array $relations Set the relationships for the model' . "\n" . '  https://docs.flightphp.com/en/v3/awesome-plugins/active-record#relationships');
         $method = $class->addMethod('__construct')
             ->addComment('Constructor')
             ->addComment('@param mixed $databaseConnection The connection to the database')
