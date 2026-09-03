@@ -1255,6 +1255,26 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertSame(1, $user->eq('name', 'bob')->updateAll([ 'password' => 'x' ]));
     }
 
+    public function testUpdateAllAllowEmptyConditionsWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        // Both flag and WHERE present: WHERE governs, flag is moot
+        $this->assertSame(1, $user->eq('name', 'bob')->updateAll([ 'password' => 'reset' ], true));
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('reset', $check->password);
+
+        $check2 = new User(new PDO('sqlite:test.db'));
+        $check2->find(2);
+        $this->assertSame('pass2', $check2->password);
+    }
+
     public function testDeleteAllMatchingRows()
     {
         $user = new User(new PDO('sqlite:test.db'));
@@ -1317,6 +1337,23 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->insert();
 
         $this->assertSame(1, $user->eq('name', 'bob')->deleteAll());
+    }
+
+    public function testDeleteAllAllowEmptyConditionsWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        // Both flag and WHERE present: WHERE governs, flag is moot
+        $this->assertSame(1, $user->eq('name', 'bob')->deleteAll(true));
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(1, $check->count());
+        $check->find(2);
+        $this->assertSame('alice', $check->name);
     }
 
     public function testInsertSetsTimestamps()
