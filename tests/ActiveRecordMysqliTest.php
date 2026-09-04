@@ -240,4 +240,58 @@ class ActiveRecordMysqliTest extends \PHPUnit\Framework\TestCase
         $this->assertNotEquals($mysqli, $db_connection);
         $this->assertInstanceOf(MysqliAdapter::class, $db_connection);
     }
+
+    public function testFetchColumn()
+    {
+        $mysqli_stmt = $this->createMock(mysqli_stmt::class);
+        $mysqli_result = $this->createMock(mysqli_result::class);
+        $mysqli_result->method('fetch_row')->will($this->onConsecutiveCalls(['1'], ['2'], false));
+        $mysqli_stmt->method('get_result')->willReturn($mysqli_result);
+
+        $MysqliStatementAdapter = new class ($mysqli_stmt) extends MysqliStatementAdapter {
+        };
+        $this->assertSame('1', $MysqliStatementAdapter->fetchColumn());
+        $this->assertSame('2', $MysqliStatementAdapter->fetchColumn());
+        $this->assertFalse($MysqliStatementAdapter->fetchColumn());
+    }
+
+    public function testFetchColumnNoResults()
+    {
+        $mysqli_stmt = $this->createMock(mysqli_stmt::class);
+        $mysqli_result = $this->createMock(mysqli_result::class);
+        $mysqli_result->method('fetch_row')->willReturn(false);
+        $mysqli_stmt->method('get_result')->willReturn($mysqli_result);
+
+        $MysqliStatementAdapter = new class ($mysqli_stmt) extends MysqliStatementAdapter {
+        };
+        $this->assertFalse($MysqliStatementAdapter->fetchColumn());
+    }
+
+    public function testFetchColumnBadResult()
+    {
+        $mysqli_stmt = $this->createMock(mysqli_stmt::class);
+        $mysqli_stmt->method('get_result')->willReturn(false);
+        $MysqliStatementAdapter = new class ($mysqli_stmt) extends MysqliStatementAdapter {
+            protected function getErrorList(): array
+            {
+                return [ [ 'sqlstate' => 'HY000', 'errno' => 1, 'error' => 'No results found'] ];
+            }
+        };
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('No results found');
+        $MysqliStatementAdapter->fetchColumn();
+    }
+
+    public function testTransactionMethods()
+    {
+        $mysqli = $this->createMock(mysqli::class);
+        $mysqli->method('begin_transaction')->willReturn(true);
+        $mysqli->method('commit')->willReturn(true);
+        $mysqli->method('rollback')->willReturn(true);
+        $adapter = new MysqliAdapter($mysqli);
+
+        $this->assertTrue($adapter->beginTransaction());
+        $this->assertTrue($adapter->commit());
+        $this->assertTrue($adapter->rollback());
+    }
 }

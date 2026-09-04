@@ -28,6 +28,21 @@ class QueryCountingAdapter implements \flight\database\DatabaseInterface
         return $this->wrappedAdapter->lastInsertId();
     }
 
+    public function beginTransaction(): bool
+    {
+        return $this->wrappedAdapter->beginTransaction();
+    }
+
+    public function commit(): bool
+    {
+        return $this->wrappedAdapter->commit();
+    }
+
+    public function rollback(): bool
+    {
+        return $this->wrappedAdapter->rollback();
+    }
+
     public function getQueryCount(): int
     {
         return count($this->executedQueries);

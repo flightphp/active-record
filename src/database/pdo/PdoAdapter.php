@@ -44,6 +44,30 @@ class PdoAdapter implements DatabaseInterface
     }
 
     /**
+     * @inheritDoc
+     */
+    public function beginTransaction(): bool
+    {
+        return $this->pdo->beginTransaction();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function commit(): bool
+    {
+        return $this->pdo->commit();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function rollback(): bool
+    {
+        return $this->pdo->rollBack();
+    }
+
+    /**
      * Returns a PDO connection to the database.
      *
      * @return PDO The PDO connection instance.

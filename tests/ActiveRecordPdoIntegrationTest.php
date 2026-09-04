@@ -48,6 +48,9 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS contact;");
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS user;");
         $this->ActiveRecord->execute("DROP TABLE IF EXISTS my_text_table;");
+        $this->ActiveRecord->execute("DROP TABLE IF EXISTS distinct_test;");
+        $this->ActiveRecord->execute("DROP TABLE IF EXISTS timestamped;");
+        $this->ActiveRecord->execute("DROP TABLE IF EXISTS no_ts_columns;");
     }
 
     public function testInsert()
@@ -776,5 +779,907 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEmpty($user->contacts);
         $this->assertIsArray($user->contacts);
         $this->assertEquals(0, count($user->contacts));
+    }
+
+    public function testCountAll()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame(3, $user->count());
+    }
+
+    public function testCountWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame(2, $user->like('name', 'bob%')->count());
+    }
+
+    public function testCountEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(0, $user->count());
+    }
+
+    public function testCountIgnoresGroup()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        // Two distinct names: a grouped count would be 2. The total is 3.
+        $this->assertSame(3, $user->groupBy('name')->count());
+    }
+
+    public function testExistsTrue()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertTrue($user->eq('name', 'bob')->exists());
+    }
+
+    public function testExistsFalse()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertFalse($user->eq('name', 'nobody')->exists());
+    }
+
+    public function testExistsNoConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertTrue($user->exists());
+    }
+
+    public function testExistsEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $this->assertFalse($user->exists());
+    }
+
+    public function testChainingCount()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'active', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'active', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame(2, $user->eq('name', 'active')->count());
+    }
+
+    public function testChainingExists()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertFalse($user->eq('name', 'nonexistent')->exists());
+    }
+
+    public function testFetchColumnInterface()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $statement = $this->ActiveRecord->execute('SELECT name FROM user ORDER BY id ASC');
+        $this->assertSame('bob', $statement->fetchColumn());
+        $this->assertSame('bob2', $statement->fetchColumn());
+        $this->assertFalse($statement->fetchColumn());
+    }
+
+    public function testFetchColumnReturnsFalseWhenNoRows()
+    {
+        $statement = $this->ActiveRecord->execute('SELECT name FROM user WHERE 1 = 0');
+        $this->assertFalse($statement->fetchColumn());
+    }
+
+    public function testPluckSingleColumn()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'bob2', 'alice' ], $user->orderByColumn('id')->pluck('name'));
+    }
+
+    public function testPluckWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'bob2' ], $user->like('name', 'bob%')->orderByColumn('id')->pluck('name'));
+    }
+
+    public function testPluckEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $this->assertSame([], $user->pluck('name'));
+    }
+
+    public function testPluckPreservesType()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        // Strings stay strings, and numeric keys stay numeric for the driver in use
+        $this->assertSame([ 'bob', 'bob2' ], $user->orderByColumn('id')->pluck('name'));
+        $this->assertEquals([ 1, 2 ], $user->orderByColumn('id')->pluck('id'));
+    }
+
+    public function testPluckWithOrder()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'alice' ], $user->orderByColumn('name', 'DESC')->pluck('name'));
+    }
+
+    public function testPluckWithLimit()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'bob2' ], $user->orderByColumn('id')->limit(2)->pluck('name'));
+    }
+
+    public function testPluckWithNullValuesDoesNotTruncate()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => null, 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', null, 'alice' ], $user->orderByColumn('id')->pluck('name'));
+    }
+
+    public function testIdsReturnsPrimaryKeys()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertEquals([ 1, 2 ], $user->orderByColumn('id')->ids());
+    }
+
+    public function testIdsWithConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertEquals([ 2 ], $user->eq('name', 'alice')->ids());
+    }
+
+    public function testChainingIds()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertEquals([ 1, 2 ], $user->eq('password', 'pass')->eq('name', 'alice', 'or')->orderByColumn('id')->ids());
+    }
+
+    public function testFirstReturnsFirstByPk()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $first = $user->first();
+        $this->assertInstanceOf(User::class, $first);
+        $this->assertSame('bob', $first->name);
+    }
+
+    public function testFirstWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $first = $user->eq('name', 'alice')->first();
+        $this->assertSame('alice', $first->name);
+    }
+
+    public function testFirstEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $first = $user->first();
+        $this->assertInstanceOf(User::class, $first);
+        $this->assertFalse($first->isHydrated());
+    }
+
+    public function testFirstRespectsExplicitOrder()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $first = $user->orderByColumn('name', 'DESC')->first();
+        $this->assertSame('bob', $first->name);
+    }
+
+    public function testLastReturnsLastByPk()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $last = $user->last();
+        $this->assertInstanceOf(User::class, $last);
+        $this->assertSame('alice', $last->name);
+    }
+
+    public function testLastWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $last = $user->eq('password', 'pass')->last();
+        $this->assertSame('bob', $last->name);
+    }
+
+    public function testLastEmptyTable()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $last = $user->last();
+        $this->assertInstanceOf(User::class, $last);
+        $this->assertFalse($last->isHydrated());
+    }
+
+    public function testLastRespectsExplicitOrder()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $last = $user->orderByColumn('name', 'DESC')->last();
+        $this->assertSame('bob', $last->name);
+    }
+
+    public function testUpdateAttributeSingleField()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $loaded = new User(new PDO('sqlite:test.db'));
+        $loaded->find(1);
+        $loaded->updateAttribute('name', 'robert');
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('robert', $check->name);
+        $this->assertSame('pass', $check->password);
+    }
+
+    public function testUpdateAttributeDoesNotTouchOtherFields()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $loaded = new User(new PDO('sqlite:test.db'));
+        $loaded->find(1);
+        $loaded->updateAttribute('password', 'newpass');
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('bob', $check->name);
+        $this->assertSame('newpass', $check->password);
+    }
+
+    public function testDistinctProducesSelectDistinct()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE distinct_test (name TEXT)");
+        $record = new class (new PDO('sqlite:test.db'), 'distinct_test') extends ActiveRecord {
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $rows = $record->distinct()->findAll();
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString('SELECT DISTINCT "distinct_test".*', $record->getBuiltSql());
+    }
+
+    public function testDistinctWithWhere()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE distinct_test (name TEXT)");
+        $record = new class (new PDO('sqlite:test.db'), 'distinct_test') extends ActiveRecord {
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+        $record->dirty([ 'name' => 'alice' ]);
+        $record->insert();
+
+        $rows = $record->eq('name', 'bob')->distinct()->findAll();
+        $this->assertCount(1, $rows);
+    }
+
+    public function testDistinctWithPluck()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame([ 'bob', 'alice' ], $user->orderByColumn('id')->distinct()->pluck('name'));
+    }
+
+    public function testUpdateAllMatchingRows()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $count = $user->eq('name', 'bob')->updateAll([ 'password' => 'newpass' ]);
+        $this->assertSame(1, $count);
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('newpass', $check->password);
+
+        $check2 = new User(new PDO('sqlite:test.db'));
+        $check2->find(2);
+        $this->assertSame('pass2', $check2->password);
+    }
+
+    public function testUpdateAllRequiresWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('updateAll() requires WHERE conditions; pass true to update every row');
+        $user->updateAll([ 'password' => 'reset' ]);
+    }
+
+    public function testUpdateAllAllowEmptyConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame(3, $user->updateAll([ 'password' => 'reset' ], true));
+    }
+
+    public function testUpdateAllReturnsCount()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame(2, $user->updateAll([ 'password' => 'x' ], true));
+        $this->assertSame(0, $user->eq('name', 'nobody')->updateAll([ 'password' => 'y' ]));
+    }
+
+    public function testUpdateAllNoCallbacks()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            protected function beforeUpdate(self $self)
+            {
+                throw new \Exception('beforeUpdate should not fire for batch updates');
+            }
+            protected function afterUpdate(self $self)
+            {
+                throw new \Exception('afterUpdate should not fire for batch updates');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertSame(1, $user->eq('name', 'bob')->updateAll([ 'password' => 'x' ]));
+    }
+
+    public function testUpdateAllAllowEmptyConditionsWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        // Both flag and WHERE present: WHERE governs, flag is moot
+        $this->assertSame(1, $user->eq('name', 'bob')->updateAll([ 'password' => 'reset' ], true));
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('reset', $check->password);
+
+        $check2 = new User(new PDO('sqlite:test.db'));
+        $check2->find(2);
+        $this->assertSame('pass2', $check2->password);
+    }
+
+    public function testDeleteAllMatchingRows()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $this->assertSame(1, $user->eq('name', 'bob')->deleteAll());
+        $this->assertSame(1, $user->count());
+    }
+
+    public function testDeleteAllRequiresWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('deleteAll() requires WHERE conditions; pass true to delete every row');
+        $user->deleteAll();
+    }
+
+    public function testDeleteAllAllowEmptyConditions()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $this->assertSame(3, $user->deleteAll(true));
+    }
+
+    public function testDeleteAllReturnsCount()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertSame(0, $user->eq('name', 'nobody')->deleteAll());
+        $this->assertSame(1, $user->deleteAll(true));
+    }
+
+    public function testDeleteAllNoCallbacks()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            protected function beforeDelete(self $self)
+            {
+                throw new \Exception('beforeDelete should not fire for batch deletes');
+            }
+            protected function afterDelete(self $self)
+            {
+                throw new \Exception('afterDelete should not fire for batch deletes');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        $this->assertSame(1, $user->eq('name', 'bob')->deleteAll());
+    }
+
+    public function testDeleteAllAllowEmptyConditionsWithWhere()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        // Both flag and WHERE present: WHERE governs, flag is moot
+        $this->assertSame(1, $user->eq('name', 'bob')->deleteAll(true));
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(1, $check->count());
+        $check->find(2);
+        $this->assertSame('alice', $check->name);
+    }
+
+    public function testInsertSetsTimestamps()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $this->assertNotNull($record->created_at);
+        $this->assertNotNull($record->updated_at);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $record->created_at);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $record->updated_at);
+    }
+
+    public function testUpdateSetsUpdatedAt()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+        $created_at = $record->created_at;
+
+        $loaded = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $loaded->find(1);
+        $loaded->updateAttribute('name', 'robert');
+
+        $this->assertSame($created_at, $loaded->created_at);
+        $this->assertNotNull($loaded->updated_at);
+        $this->assertGreaterThanOrEqual($created_at, $loaded->updated_at);
+    }
+
+    public function testTimestampsDisabledByDefault()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $this->assertNull($record->created_at);
+        $this->assertNull($record->updated_at);
+    }
+
+    public function testTimestampsDontOverwrite()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->created_at = '2024-01-01 00:00:00';
+        $record->updated_at = '2024-01-01 00:00:00';
+        $record->name = 'bob';
+        $record->insert();
+
+        $this->assertSame('2024-01-01 00:00:00', $record->created_at);
+        $this->assertSame('2024-01-01 00:00:00', $record->updated_at);
+    }
+
+    public function testTimestampsWithCustomFormat()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE timestamped (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'timestamped') extends ActiveRecord {
+            protected bool $timestamps = true;
+            protected function setTimestamps(bool $isNew = true): void
+            {
+                if ($isNew === true) {
+                    $this->created_at = 'custom-created';
+                }
+                $this->updated_at = 'custom-updated';
+            }
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+        $record->insert();
+
+        $this->assertSame('custom-created', $record->created_at);
+        $this->assertSame('custom-updated', $record->updated_at);
+    }
+
+    public function testTimestampsMissingColumnsErrors()
+    {
+        $this->ActiveRecord->execute("CREATE TABLE no_ts_columns (
+            id INTEGER PRIMARY KEY,
+            name TEXT
+        )");
+        $record = new class (new PDO('sqlite:test.db'), 'no_ts_columns') extends ActiveRecord {
+            protected bool $timestamps = true;
+        };
+        $record->dirty([ 'name' => 'bob' ]);
+
+        try {
+            $record->insert();
+            $this->fail('Enabling timestamps on a table without the columns should error');
+        } catch (\Exception $e) {
+            $this->assertStringContainsString('has no column named created_at', $e->getMessage());
+        }
+    }
+
+    public function testScopeReturnsConfiguredModel()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function namedBob(): self
+            {
+                return $this->eq('name', 'bob');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $result = $user->namedBob();
+        $this->assertSame($user, $result);
+        $this->assertTrue($user->exists());
+    }
+
+    public function testScopesChainable()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function namedBob(): self
+            {
+                return $this->eq('name', 'bob');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bobby', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $users = $user->namedBob()->eq('password', 'pass')->findAll();
+        $this->assertCount(1, $users);
+        $this->assertSame('bob', $users[0]->name);
+    }
+
+    public function testScopeWithParams()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function nameLike(string $name): self
+            {
+                return $this->like('name', $name . '%');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'bobby', 'password' => 'pass2' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass3' ]);
+        $user->insert();
+
+        $users = $user->nameLike('bob')->findAll();
+        $this->assertCount(2, $users);
+    }
+
+    public function testScopeHelperByName()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function namedBob(): self
+            {
+                return $this->eq('name', 'bob');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+        $user->dirty([ 'name' => 'alice', 'password' => 'pass2' ]);
+        $user->insert();
+
+        $users = $user->scope('namedBob')->findAll();
+        $this->assertCount(1, $users);
+        $this->assertSame('bob', $users[0]->name);
+    }
+
+    public function testScopeOnConfiguredInstance()
+    {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
+            public function namedBob(): self
+            {
+                return $this->eq('name', 'bob');
+            }
+        };
+        $user->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+        $user->insert();
+
+        // Scopes run against the live connection — no null-connection crash
+        $found = $user->namedBob()->find();
+        $this->assertTrue($found->isHydrated());
+        $this->assertSame('bob', $found->name);
+    }
+
+    public function testTransactionCommit()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->transaction(function ($u) {
+            $u->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+            $u->insert();
+        });
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(1, $check->count());
+    }
+
+    public function testTransactionRollback()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'keep', 'password' => 'pass' ]);
+        $user->insert();
+
+        try {
+            $user->transaction(function ($u) {
+                $u->dirty([ 'name' => 'rolled', 'password' => 'pass2' ]);
+                $u->insert();
+                throw new \Exception('boom');
+            });
+            $this->fail('Exception should have been re-thrown');
+        } catch (\Exception $e) {
+            $this->assertSame('boom', $e->getMessage());
+        }
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(1, $check->count());
+    }
+
+    public function testTransactionReturnsValue()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $result = $user->transaction(function ($u) {
+            $u->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+            $u->insert();
+            return 42;
+        });
+
+        $this->assertSame(42, $result);
+    }
+
+    public function testTransactionRethrowsException()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('boom');
+        $user->transaction(function () {
+            throw new \Exception('boom');
+        });
+    }
+
+    public function testTransactionMultipleInserts()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->transaction(function ($u) {
+            $u->dirty([ 'name' => 'bob', 'password' => 'pass' ]);
+            $u->insert();
+            $u->dirty([ 'name' => 'bob2', 'password' => 'pass2' ]);
+            $u->insert();
+        });
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $this->assertSame(2, $check->count());
+    }
+
+    public function testTransactionRollbackPreservesState()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->dirty([ 'name' => 'keep', 'password' => 'pass' ]);
+        $user->insert();
+
+        try {
+            $user->transaction(function ($u) {
+                $u->dirty([ 'name' => 'doomed', 'password' => 'pass2' ]);
+                $u->insert();
+                throw new \Exception('rollback');
+            });
+            $this->fail('Exception should have been re-thrown');
+        } catch (\Exception $e) {
+            // expected
+        }
+
+        $check = new User(new PDO('sqlite:test.db'));
+        $check->find(1);
+        $this->assertSame('keep', $check->name);
+        $this->assertSame(1, $check->count());
+    }
+
+    public function testTransactionNestedAttempts()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+
+        try {
+            $user->transaction(function ($u) {
+                $u->transaction(function () {
+                    return null;
+                });
+            });
+            $this->fail('Nested transactions are not supported and should throw');
+        } catch (\Exception $e) {
+            $this->assertStringContainsString('transaction', strtolower($e->getMessage()));
+        }
     }
 }

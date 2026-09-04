@@ -20,4 +20,25 @@ interface DatabaseInterface
      * @return int|string
      */
     public function lastInsertId();
+
+    /**
+     * Begin a transaction
+     *
+     * @return bool
+     */
+    public function beginTransaction(): bool;
+
+    /**
+     * Commit the active transaction
+     *
+     * @return bool
+     */
+    public function commit(): bool;
+
+    /**
+     * Roll back the active transaction
+     *
+     * @return bool
+     */
+    public function rollback(): bool;
 }

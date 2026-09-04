@@ -167,6 +167,16 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected bool $isHydrated = false;
 
     /**
+     * @var boolean Whether the next SELECT query should use SELECT DISTINCT
+     */
+    protected bool $isDistinct = false;
+
+    /**
+     * @var boolean Whether created_at/updated_at are managed automatically on insert/update
+     */
+    protected bool $timestamps = false;
+
+    /**
      * The construct
      *
      * @param mixed   $databaseConnection  Database object (PDO, mysqli, etc)
@@ -354,6 +364,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->sqlExpressions = [];
         $this->join = null;
         $this->eagerLoad = [];
+        $this->isDistinct = false;
         return $this;
     }
     /**
@@ -582,6 +593,110 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->processEvent('afterFindAll', [$results]);
         return $results;
     }
+
+    /**
+     * Count the number of records matching the current query conditions.
+     *
+     * Any active group/groupBy is intentionally ignored: `SELECT COUNT(*) ... GROUP BY`
+     * returns one row per group, which a single scalar count cannot represent.
+     *
+     * @return int
+     */
+    public function count(): int
+    {
+        $this->select = new Expressions([
+            'operator' => 'SELECT COUNT(*) AS _ar_count'
+        ]);
+
+        $result = $this->queryScalar($this->buildSql(['select', 'from', 'join', 'where', 'having']), $this->params);
+
+        return (int) $result;
+    }
+
+    /**
+     * Whether any records match the current query conditions.
+     *
+     * @return bool
+     */
+    public function exists(): bool
+    {
+        $this->select = new Expressions([
+            'operator' => 'SELECT 1'
+        ]);
+
+        if ($this->limit === null) {
+            $this->limit(1);
+        }
+
+        $result = $this->queryScalar($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'limit']), $this->params);
+
+        return $result !== false;
+    }
+
+    /**
+     * Fetch a single column's values for all matching records.
+     *
+     * @param string $column Column name
+     * @return array<int, mixed>
+     */
+    public function pluck(string $column): array
+    {
+        $prefix = $this->isDistinct ? 'SELECT DISTINCT ' : 'SELECT ';
+        $this->select = new Expressions([
+            'operator' => $prefix . $this->escapeIdentifier($column)
+        ]);
+
+        return $this->queryColumn($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params);
+    }
+
+    /**
+     * Fetch the primary keys of all matching records.
+     *
+     * @return array<int, mixed>
+     */
+    public function ids(): array
+    {
+        return $this->pluck($this->primaryKey);
+    }
+
+    /**
+     * Find the first record matching the current query conditions.
+     *
+     * Defaults to ordering by the primary key ascending and limiting to 1
+     * unless an explicit order/limit is already set. Like find(), never
+     * returns null — check isHydrated() when nothing matched.
+     *
+     * @return self
+     */
+    public function first(): self
+    {
+        if ($this->order === null) {
+            $this->orderByColumn($this->primaryKey, 'ASC');
+        }
+        if ($this->limit === null) {
+            $this->limit(1);
+        }
+        return $this->find();
+    }
+
+    /**
+     * Find the last record matching the current query conditions.
+     *
+     * Same as first() but defaults to ordering by the primary key descending.
+     * Like find(), never returns null — check isHydrated() when nothing matched.
+     *
+     * @return self
+     */
+    public function last(): self
+    {
+        if ($this->order === null) {
+            $this->orderByColumn($this->primaryKey, 'DESC');
+        }
+        if ($this->limit === null) {
+            $this->limit(1);
+        }
+        return $this->find();
+    }
     /**
      * Function to delete current record in database.
      * @return bool
@@ -597,11 +712,35 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         return $result instanceof DatabaseStatementInterface;
     }
     /**
+     * Set timestamp columns on insert/update if $this->timestamps is true.
+     *
+     * Explicitly dirty values are never overwritten.
+     *
+     * @param bool $isNew True when inserting, false when updating
+     * @return void
+     */
+    protected function setTimestamps(bool $isNew = true): void
+    {
+        if ($this->timestamps === false) {
+            return;
+        }
+        $now = date('Y-m-d H:i:s');
+        if ($isNew === true && array_key_exists('created_at', $this->dirty) === false) {
+            $this->created_at = $now;
+        }
+        if (array_key_exists('updated_at', $this->dirty) === false) {
+            $this->updated_at = $now;
+        }
+    }
+
+    /**
      * function to build insert SQL, and insert current record into database.
      * @return bool|ActiveRecord if insert success return current object
      */
     public function insert(): ActiveRecord
     {
+        $this->setTimestamps(true);
+
         // execute this before anything else, this could change $this->dirty
         $this->processEvent(['beforeInsert', 'beforeSave'], [$this]);
 
@@ -655,6 +794,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function update(): ActiveRecord
     {
+        $this->setTimestamps(false);
+
         $this->processEvent(['beforeUpdate', 'beforeSave'], [$this]);
 
         // Sync typed public properties that changed since the last find/sync.
@@ -672,6 +813,93 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->processEvent(['afterUpdate', 'afterSave'], [$this]);
 
         return $this->dirty()->resetQueryData();
+    }
+
+    /**
+     * Update a single attribute on this record in the database.
+     *
+     * Requires a loaded record (see update()). Does not run validation.
+     *
+     * @param string $name  Column name
+     * @param mixed  $value New value for the column
+     * @return self
+     */
+    public function updateAttribute(string $name, $value): self
+    {
+        return $this->dirty([ $name => $value ])->update();
+    }
+
+    /**
+     * Update all records matching the current query conditions in a single
+     * statement (batch update). No callbacks are fired and no records are
+     * hydrated.
+     *
+     * Refuses to run without WHERE conditions unless $allowEmptyConditions
+     * is explicitly set to true.
+     *
+     * @param array $attributes Column/value pairs
+     * @param bool  $allowEmptyConditions Allow updating every row when no WHERE conditions are set
+     * @return int Affected row count
+     * @throws Exception When no WHERE conditions are set and $allowEmptyConditions is false
+     */
+    public function updateAll(array $attributes, bool $allowEmptyConditions = false): int
+    {
+        if ($allowEmptyConditions === false && $this->where === null) {
+            throw new Exception('updateAll() requires WHERE conditions; pass true to update every row');
+        }
+
+        foreach ($attributes as $field => $value) {
+            $this->addCondition($field, '=', $value, ',', 'set');
+        }
+
+        return $this->execute($this->buildSql(['update', 'set', 'where']), $this->params)->rowCount();
+    }
+
+    /**
+     * Delete all records matching the current query conditions in a single
+     * statement (batch delete). No callbacks are fired and no records are
+     * hydrated.
+     *
+     * Refuses to run without WHERE conditions unless $allowEmptyConditions
+     * is explicitly set to true.
+     *
+     * @param bool $allowEmptyConditions Allow deleting every row when no WHERE conditions are set
+     * @return int Affected row count
+     * @throws Exception When no WHERE conditions are set and $allowEmptyConditions is false
+     */
+    public function deleteAll(bool $allowEmptyConditions = false): int
+    {
+        if ($allowEmptyConditions === false && $this->where === null) {
+            throw new Exception('deleteAll() requires WHERE conditions; pass true to delete every row');
+        }
+
+        return $this->execute($this->buildSql(['delete', 'from', 'where']), $this->params)->rowCount();
+    }
+
+    /**
+     * Execute a callable within a database transaction.
+     *
+     * If the callable returns normally, the transaction is committed.
+     * If the callable throws, the transaction is rolled back and the exception re-thrown.
+     *
+     * Note: nested transactions are not supported (no savepoints).
+     *
+     * @template T
+     * @param callable(self): T $callback
+     * @return T The return value of the callback
+     * @throws \Throwable Re-thrown if the callback fails
+     */
+    public function transaction(callable $callback)
+    {
+        $this->databaseConnection->beginTransaction();
+        try {
+            $result = $callback($this);
+            $this->databaseConnection->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            $this->databaseConnection->rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -749,6 +977,35 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $result[] = $new_obj;
         }
         return $result;
+    }
+
+    /**
+     * Execute a SQL query and return a single scalar value.
+     *
+     * @param string $sql    SQL with named placeholders
+     * @param array  $params Bound parameters
+     * @return mixed The first column of the first row, or false if no row is available
+     */
+    private function queryScalar(string $sql, array $params = [])
+    {
+        return $this->execute($sql, $params)->fetchColumn();
+    }
+
+    /**
+     * Execute a SQL query and return an array of values from a single column.
+     *
+     * @param string $sql    SQL with named placeholders
+     * @param array  $params Bound parameters
+     * @return array<int, mixed>
+     */
+    private function queryColumn(string $sql, array $params = []): array
+    {
+        $statement = $this->execute($sql, $params);
+        $values = [];
+        while (($value = $statement->fetchColumn()) !== false) {
+            $values[] = $value;
+        }
+        return $values;
     }
     /**
      * helper function to get relation of this object.
@@ -996,9 +1253,10 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected function buildSqlCallback(string $sqlStatement, ActiveRecord $object): string
     {
         // First add the SELECT table.*
-        if ('select' === $sqlStatement && null == $object->$sqlStatement) {
-            $sqlStatement = strtoupper($sqlStatement) . ' ' . $this->escapeIdentifier($object->table) . '.*';
-        } elseif (('update' === $sqlStatement || 'from' === $sqlStatement) && null == $object->$sqlStatement) {
+        if ('select' === $sqlStatement && null === $object->$sqlStatement) {
+            $prefix = $object->isDistinct ? 'SELECT DISTINCT ' : 'SELECT ';
+            $sqlStatement = $prefix . $this->escapeIdentifier($object->table) . '.*';
+        } elseif (('update' === $sqlStatement || 'from' === $sqlStatement) && null === $object->$sqlStatement) {
             $sqlStatement = strtoupper($sqlStatement) . ' ' . $this->escapeIdentifier($object->table);
         } elseif ('delete' === $sqlStatement) {
             $sqlStatement = strtoupper($sqlStatement);
@@ -1023,8 +1281,6 @@ abstract class ActiveRecord extends Base implements JsonSerializable
                 $finalSql[] = $statement;
             }
         }
-        //this code to debug info.
-        //echo 'SQL: ', implode(' ', $sqlStatements), "\n", "PARAMS: ", implode(', ', $this->params), "\n";
         $this->builtSql = implode(' ', $finalSql);
 
         // get rid of multiple spaces in the query for prettiness
@@ -1178,6 +1434,40 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             )
         ]);
         return $this;
+    }
+
+    /**
+     * Select distinct rows on the next query.
+     *
+     * Applies to the default table.* select and to pluck(); count() deliberately
+     * ignores it (DISTINCT over a single aggregate row is a no-op).
+     *
+     * @return self
+     */
+    public function distinct(): self
+    {
+        $this->isDistinct = true;
+        return $this;
+    }
+
+    /**
+     * Call a named scope method on this model by name.
+     *
+     * Scopes are convention-based instance methods on the subclass that return
+     * $this, e.g. `public function published(): self { return $this->eq('status', 'published'); }`.
+     * They must be called on an instance that already has a database connection.
+     *
+     * @param string $name  Scope method name
+     * @param mixed  ...$args Arguments to pass to the scope method
+     * @return self
+     * @throws \BadMethodCallException if the scope method does not exist
+     */
+    public function scope(string $name, ...$args): self
+    {
+        if (method_exists($this, $name) === false) {
+            throw new \BadMethodCallException("Scope '{$name}' does not exist");
+        }
+        return $this->{$name}(...$args);
     }
 
     /**
