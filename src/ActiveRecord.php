@@ -456,7 +456,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
             if ($onlyChanged) {
                 $storedValue = $this->data[$name] ?? null;
-                if ($currentValue != $storedValue) {
+                if ($currentValue !== $storedValue) {
                     $this->dirty[$name] = $currentValue;
                 }
             } else {

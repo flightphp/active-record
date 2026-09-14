@@ -17,6 +17,12 @@ class TypedUser extends ActiveRecord
     public ?string $created_dt = null;
 
     /**
+     * Nullable float column so tests can prove strict comparison detection
+     * when a falsy value (0.0) is written over a NULL stored value.
+     */
+    public ?float $credits = null;
+
+    /**
      * Intentionally left unset in many tests so sync helpers skip uninitialized props.
      * @var string
      */

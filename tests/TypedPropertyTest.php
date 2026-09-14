@@ -32,7 +32,8 @@ class TypedPropertyTest extends \PHPUnit\Framework\TestCase
             id INTEGER PRIMARY KEY,
             name TEXT,
             password TEXT,
-            created_dt TEXT
+            created_dt TEXT,
+            credits REAL
         )");
     }
 
@@ -78,6 +79,31 @@ class TypedPropertyTest extends \PHPUnit\Framework\TestCase
 
         $row = $this->pdo->query("SELECT * FROM user WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
         $this->assertSame('eve_updated', $row['name'], 'update should persist changed typed property');
+    }
+
+    public function testSyncDoesNotDirtyUnchangedTypedProperties(): void
+    {
+        $this->pdo->exec("INSERT INTO user (name, password, credits) VALUES ('neo', 'hash10', NULL)");
+
+        $user = new TypedUser($this->pdo);
+        $user->eq('name', 'neo')->find();
+
+        // Re-assign the exact values the typed properties already hold
+        $user->name = 'neo';
+        $user->credits = null;
+
+        $sync = new \ReflectionMethod(\flight\ActiveRecord::class, 'syncDirtyFromProperties');
+        $sync->setAccessible(true);
+        $sync->invoke($user, true);
+
+        $dirtyProp = new \ReflectionProperty(\flight\ActiveRecord::class, 'dirty');
+        $dirtyProp->setAccessible(true);
+
+        $this->assertSame(
+            [],
+            $dirtyProp->getValue($user),
+            're-assigning identical values to typed properties must not mark them dirty (no spurious UPDATE)'
+        );
     }
 
     public function testUpdateDoesNotTouchUnchangedFields(): void
@@ -146,7 +172,45 @@ class TypedPropertyTest extends \PHPUnit\Framework\TestCase
         );
     }
 
-    public function testSyncDirtySkipsPropertiesAlreadyInDirty(): void
+    public function testUpdatePersistsZeroFloatOverNull(): void
+    {
+        $this->pdo->exec("INSERT INTO user (name, password) VALUES ('kara', 'hash8')");
+
+        $user = new TypedUser($this->pdo);
+        $user->eq('name', 'kara')->find();
+
+        $this->assertNull($user->credits, 'fixture: credits is NULL in the DB');
+
+        $user->credits = 0.0;
+        $user->save();
+
+        $row = $this->pdo->query("SELECT credits FROM user WHERE id = " . (int) $user->id)->fetch(PDO::FETCH_ASSOC);
+        $this->assertNotNull($row['credits'], '0.0 must be persisted over a NULL stored value');
+        $this->assertEquals(0.0, (float) $row['credits']);
+    }
+
+    public function testSyncDetectsFloatZeroChangeFromNull(): void
+    {
+        $this->pdo->exec("INSERT INTO user (name, password) VALUES ('lena', 'hash9')");
+
+        $user = new TypedUser($this->pdo);
+        $user->eq('name', 'lena')->find();
+
+        $user->credits = 0.0;
+
+        $sync = new \ReflectionMethod(\flight\ActiveRecord::class, 'syncDirtyFromProperties');
+        $sync->setAccessible(true);
+        $sync->invoke($user, true);
+
+        $dirtyProp = new \ReflectionProperty(\flight\ActiveRecord::class, 'dirty');
+        $dirtyProp->setAccessible(true);
+        $dirty = $dirtyProp->getValue($user);
+
+        $this->assertArrayHasKey('credits', $dirty, '0.0 must be marked dirty when the stored value is NULL');
+        $this->assertSame(0.0, $dirty['credits']);
+    }
+
+    public function testSyncSkipsPropertiesAlreadyInDirty(): void
     {
         $user = new TypedUser($this->pdo);
         $user->name = 'prefilled';
